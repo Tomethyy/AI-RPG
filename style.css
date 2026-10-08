@@ -28,12 +28,12 @@ body { font: 17px/1.5 Georgia, "Iowan Old Style", serif; overscroll-behavior: no
   flex-direction: column;
   max-width: 640px;
   margin: 0 auto;
-  padding-top: env(safe-area-inset-top);
 }
 .app.kb { bottom: auto; height: var(--app-h); }
 
+/* Solid header block (status-bar inset, title row, HP bar). The story scroller starts below it. */
+.head { flex: none; position: relative; z-index: 2; background: var(--bg); padding-top: env(safe-area-inset-top); }
 .topbar {
-  flex: none; position: relative; z-index: 2; background: var(--bg);
   display: flex; justify-content: space-between; align-items: baseline;
   padding: 8px 16px 6px;
   font-family: system-ui, sans-serif; font-size: 14px; color: var(--text);
@@ -41,16 +41,16 @@ body { font: 17px/1.5 Georgia, "Iowan Old Style", serif; overscroll-behavior: no
 .topbar .title { font-weight: 700; }
 .topbar .stats { font-weight: 600; }
 
-.hpbar { flex: none; position: relative; z-index: 2; height: 4px; background: var(--line); }
+.hpbar { height: 4px; background: var(--line); }
 .hpbar > div { height: 100%; width: 100%; background: var(--good); transition: width 0.4s ease; }
 .hpbar.mid > div { background: var(--amber); }
 .hpbar.low > div { background: var(--bad); }
 
-/* The top 18px fades out, so scrolled lines dissolve instead of showing half-cut under the HP bar. */
+/* The top 8px is fully hidden and the next 16px fade in, so no text sliver shows right under the HP bar. */
 .story {
   flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; -webkit-overflow-scrolling: touch;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 18px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 8px, #000 24px);
+  mask-image: linear-gradient(to bottom, transparent 0, transparent 8px, #000 24px);
 }
 .story p { margin: 0 0 14px; }
 .story .chosen {
@@ -80,7 +80,7 @@ body { font: 17px/1.5 Georgia, "Iowan Old Style", serif; overscroll-behavior: no
 .actions {
   flex: none;
   border-top: 1px solid var(--line); background: var(--panel);
-  padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+  padding: 6px 12px calc(env(safe-area-inset-bottom) + 12px);
   font-family: system-ui, sans-serif;
 }
 .options { display: grid; gap: 5px; margin-bottom: 6px; }
@@ -113,7 +113,7 @@ body { font: 17px/1.5 Georgia, "Iowan Old Style", serif; overscroll-behavior: no
 .backdrop { position: absolute; inset: 0; z-index: 20; background: rgba(0, 0, 0, 0.55); }
 .sheet {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 21;
-  padding: 0 12px calc(14px + env(safe-area-inset-bottom));
+  padding: 0 12px calc(env(safe-area-inset-bottom) + 12px);
   background: var(--panel); border-top: 1px solid var(--accent); border-radius: 16px 16px 0 0;
   font-family: system-ui, sans-serif;
 }
