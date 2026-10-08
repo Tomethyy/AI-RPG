@@ -4,6 +4,10 @@ name = "ai-rpg"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 
+# Serve on ai-rpg.<subdomain>.workers.dev; no per-version preview URLs.
+workers_dev = true
+preview_urls = false
+
 # Keep variables set in the dashboard (DAILY_CAP_USD, TURN_MODEL, ...) across deploys.
 keep_vars = true
 
