@@ -210,6 +210,15 @@ Runtime models for the game itself are a separate question (see Open questions a
 - Pressure on the player: day counter and consumable supplies, or a threat clock on the main quest (needs a decision)
 - Bot-played consistency and cost tests
 
+## Character progression review (added after Phase 3, not yet planned in detail)
+
+Phase 3 shipped a first guess: 3 stats at +0..+2, +1 to the lowest stat per level, 20 XP per level, level cap 10, stats only add to d20 rolls (plus a +1 gear bonus). Revisit with real play data, ideally in Phase 8 and the stat-choice part with the Character screen in Phase 7:
+- Revise the starting stats and the size of the numbers (maybe larger values than +0..+2, with the difficulty band scaled to match).
+- Let the player choose which stat gets the level-up point (now automatic).
+- Bot-play XP and level-ups to balance pace: XP per roll, XP per level, how many turns a level takes.
+- Revisit the max level (now 10) and what happens at the cap.
+- Decide what each stat should actually do. Now: might, wits and grit only add to rolls, and combat (Phase 5) will need its own use for them.
+
 ## Later (not in v1)
 
 - **Companions:** each needs a ledger record, stats, combat participation and an AI voice, so more context per turn and more rules. Design the memory schema so it does not block them, but do not build them first.
