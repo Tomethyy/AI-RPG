@@ -8,7 +8,7 @@
   --accent: #d9a441;
   --good: #7fb069;
   --bad: #d96459;
-  --build: "1.6";
+  --build: "1.7";
   color-scheme: dark;
 }
 
@@ -30,6 +30,10 @@ body { font: 17px/1.5 Georgia, "Iowan Old Style", serif; overscroll-behavior: no
   max-width: 640px;
   margin: 0 auto;
 }
+/* Home Screen app (measured on device): iOS reports a viewport 62pt shorter than the screen and dims fixed
+   content near the top edge. So: not fixed, full 100vh (= screen height there), header 16pt below the inset. */
+.standalone .app { position: absolute; bottom: auto; height: 100vh; }
+.standalone .head { padding-top: calc(env(safe-area-inset-top) + 16px); }
 .app.kb { bottom: auto; height: var(--app-h); }
 
 /* Solid header block (status-bar inset, title row, HP bar). The story scroller starts below it. */
@@ -128,11 +132,6 @@ body { font: 17px/1.5 Georgia, "Iowan Old Style", serif; overscroll-behavior: no
 }
 .sheet-body { display: grid; gap: 8px; }
 .sheet-foot { margin-top: 12px; color: var(--muted); font: 12px/1.4 ui-monospace, Menlo, monospace; }
-.sheet-foot .tests { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
-.sheet-foot .tests button { min-height: 36px; font: 12px ui-monospace, Menlo, monospace; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
-.sheet-foot .tests button.on { border-color: var(--accent); color: var(--accent); }
-.app.abs { position: absolute; }
-.app.head16 .head { padding-top: calc(env(safe-area-inset-top) + 16px); }
 .sheet-foot pre { margin: 6px 0 0; white-space: pre-wrap; font: inherit; opacity: 0.8; }
 .backdrop[hidden], .sheet[hidden] { display: none; }
 .sheet button {
