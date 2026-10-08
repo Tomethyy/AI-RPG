@@ -177,7 +177,14 @@ const FALLBACK_OK = /^claude-(sonnet-5-5|opus-5-5|opus-5|fable-5-1)$/;
 // cost covers every billed attempt, failed ones included, so the daily cap sees them.
 export async function runTurn(env, save, action, dice) {
   const model = env.TURN_MODEL || DEFAULT_TURN_MODEL;
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, baseURL: env.ANTHROPIC_BASE_URL || undefined, maxRetries: 1, timeout: 60_000 });
+  const client = new Anthropic({
+    apiKey: env.ANTHROPIC_API_KEY,
+    baseURL: env.ANTHROPIC_BASE_URL || undefined,
+    // Organization-level keys must name a workspace on every request; workspace keys don't need this.
+    defaultHeaders: env.ANTHROPIC_WORKSPACE_ID ? { "anthropic-workspace-id": env.ANTHROPIC_WORKSPACE_ID.trim() } : undefined,
+    maxRetries: 1,
+    timeout: 60_000,
+  });
   const { system, messages } = buildPrompt(save, action, dice);
   let useFallbacks = FALLBACK_OK.test(model);
   let lastError = "";

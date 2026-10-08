@@ -9,7 +9,7 @@ Phone-first solo RPG. See `PLAN.md` for the full plan.
   Cloudflare deploys it from `main` (Workers Builds, root directory `worker`).
 
 Secrets live only in the Cloudflare dashboard (Worker → Settings → Variables and Secrets):
-`ANTHROPIC_API_KEY`, `GAME_KEY`. Optional plain variables: `DAILY_CAP_USD` (default 1),
+`ANTHROPIC_API_KEY`, `GAME_KEY` (and `ANTHROPIC_WORKSPACE_ID` only if the API key is not tied to a workspace). Optional plain variables: `DAILY_CAP_USD` (default 1),
 `TURN_MODEL` (default claude-sonnet-5-5), `TURN_EFFORT` (default low).
 
 Before each deploy run `python3 stamp.py` (stamps build number and time into index.html, style.css and app.js; shown in the More sheet).
