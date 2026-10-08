@@ -48,6 +48,7 @@ const TURNS = [
   },
 ];
 
+const JS_BUILD = "1.5"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Look", "Talk", "Travel", "Rest"];
 const MORE = ["Inventory", "Wildcard", "Custom action"];
@@ -141,6 +142,51 @@ function closeCustom() {
 function setSheet(open) {
   sheet.hidden = backdrop.hidden = !open;
   sheet.style.transform = "";
+  if (open) showBuildInfo();
+}
+
+// Build stamp + live layout numbers, so the Home Screen app can be compared with Safari.
+const metaBuild = (document.querySelector('meta[name="build"]')?.content || "?|").split("|");
+const HTML_BUILD = metaBuild[0];
+const CSS_BUILD = getComputedStyle(document.documentElement).getPropertyValue("--build").replace(/["'\s]/g, "");
+
+// html, css and js are stamped together. If a cached file is from another build, reload once past the cache.
+if (new Set([HTML_BUILD, CSS_BUILD, JS_BUILD]).size > 1 && !location.search.includes("fresh=")) {
+  location.replace(location.pathname + "?fresh=" + Date.now());
+}
+
+// What sits on top of a node, ignoring the More sheet itself (it is open while we measure).
+function topEl(node) {
+  const r = node.getBoundingClientRect();
+  sheet.style.pointerEvents = backdrop.style.pointerEvents = "none";
+  const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+  sheet.style.pointerEvents = backdrop.style.pointerEvents = "";
+  return e ? e.tagName.toLowerCase() + (e.id ? "#" + e.id : "") : "none";
+}
+
+function showBuildInfo() {
+  const when = new Date(metaBuild[1]);
+  const time = isNaN(when) ? "?" : when.toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+  const same = new Set([HTML_BUILD, CSS_BUILD, JS_BUILD]).size === 1;
+  $("buildStamp").textContent = `build ${HTML_BUILD} · ${time}` + (same ? "" : `  (MISMATCH html ${HTML_BUILD} css ${CSS_BUILD} js ${JS_BUILD})`);
+
+  const probe = el("div");
+  probe.style.cssText = "position:fixed;visibility:hidden;top:0;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)";
+  document.body.append(probe);
+  const insetSum = probe.getBoundingClientRect().height;
+  probe.remove();
+  const cs = getComputedStyle($("hp"));
+  const vv = window.visualViewport;
+  const lastBtn = generic.hidden ? null : generic.querySelector("button");
+  const lines = [
+    `mode ${navigator.standalone || matchMedia("(display-mode: standalone)").matches ? "standalone" : "browser"}`,
+    `inner ${innerWidth}x${innerHeight}  visual ${vv ? Math.round(vv.width) + "x" + Math.round(vv.height) : "n/a"}  screen ${screen.width}x${screen.height}`,
+    `insets top+bottom ${insetSum}  app.kb ${$("app").classList.contains("kb")}`,
+    `app bottom ${Math.round($("app").getBoundingClientRect().bottom)}  gap below buttons ${lastBtn ? Math.round(innerHeight - lastBtn.getBoundingClientRect().bottom) : "n/a"}`,
+    `header title y ${Math.round($("location").getBoundingClientRect().top)}  on top: ${topEl($("location"))} / ${topEl($("hp"))}`,
+    `title opacity ${getComputedStyle($("location")).opacity} color ${getComputedStyle($("location")).color}  hp color ${cs.color}`,
+  ];
+  $("diag").textContent = lines.join("\n");
 }
 
 function useGeneric(label) {
@@ -205,7 +251,8 @@ $("customCancel").addEventListener("click", closeCustom);
 if (window.visualViewport) {
   const vv = window.visualViewport;
   const fit = () => {
-    const keyboard = window.innerHeight - vv.height > 80;
+    // Only shrink for the keyboard while the input is focused; a stray viewport difference must never shorten the layout.
+    const keyboard = document.activeElement === customText && window.innerHeight - vv.height > 80;
     const app = document.getElementById("app");
     app.classList.toggle("kb", keyboard);
     app.style.setProperty("--app-h", keyboard ? vv.height + "px" : "");
@@ -213,6 +260,7 @@ if (window.visualViewport) {
   };
   vv.addEventListener("resize", fit);
   vv.addEventListener("scroll", fit);
+  customText.addEventListener("blur", fit);
 }
 
 buildGeneric();
