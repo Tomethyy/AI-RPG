@@ -1,5 +1,5 @@
-// Phase 1 skeleton: everything here is hardcoded. No backend, no AI, no rules engine.
-// Dice values are fixed fake data so the layout can be judged on the phone.
+// Story screen. Online: turns come from the backend (More → Server). Offline: the Phase 1 hardcoded demo below.
+// Dice are placeholders until the Phase 3 rules engine.
 
 const TURNS = [
   {
@@ -48,10 +48,11 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.7"; // stamped by stamp.py
+const JS_BUILD = "1.8"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Look", "Talk", "Travel", "Rest"];
 const MORE = ["Inventory", "Wildcard", "Custom action"];
+const LS = { server: "rpg.server", key: "rpg.key", pending: "rpg.pending" };
 
 const $ = (id) => document.getElementById(id);
 const story = $("story");
@@ -73,51 +74,187 @@ function addNote(text) {
   scrollDown();
 }
 
-function renderDice(d) {
+function renderDice(d, animate = true) {
   const box = el("div", "dice");
-  const die = el("div", "die rolling", "…");
+  const die = el("div", animate ? "die rolling" : "die", animate ? "…" : String(d.die));
   const math = el("div", "math");
   const total = d.die + d.mod;
   const result = el("div", "result " + (d.success ? "success" : "fail"), d.success ? "Success" : "Failure");
   math.innerHTML = `d20 <b>${d.die}</b> + ${d.label} <b>${d.mod >= 0 ? "+" : ""}${d.mod}</b> = <b>${total}</b> vs DC <b>${d.dc}</b><br>`;
   math.append(result);
   box.append(die, math);
-  setTimeout(() => { die.textContent = d.die; die.classList.remove("rolling"); }, 500);
+  if (animate) setTimeout(() => { die.textContent = d.die; die.classList.remove("rolling"); }, 500);
   return box;
+}
+
+function renderHeader(location, hp, hpMax, turnNo) {
+  $("location").textContent = location;
+  $("hp").textContent = `HP ${hp}/${hpMax}`;
+  $("hpfill").style.width = (hp / hpMax) * 100 + "%";
+  const pct = hp / hpMax;
+  $("hpbar").classList.toggle("mid", pct <= 0.5 && pct >= 0.25);
+  $("hpbar").classList.toggle("low", pct < 0.25);
+  $("hpbar").setAttribute("aria-valuenow", hp);
+  $("hpbar").setAttribute("aria-valuemax", hpMax);
+  $("turn").textContent = "Turn " + turnNo;
+}
+
+function renderOptions(texts, onPick) {
+  const options = $("options");
+  options.replaceChildren();
+  texts.forEach((text, i) => {
+    const btn = el("button", "", text);
+    btn.type = "button";
+    btn.addEventListener("click", () => onPick(i, text));
+    options.append(btn);
+  });
 }
 
 function renderTurn(index, chosenText) {
   const turn = TURNS[index];
-  $("location").textContent = turn.location;
-  $("hp").textContent = `HP ${turn.hp}/${HP_MAX}`;
-  $("hpfill").style.width = (turn.hp / HP_MAX) * 100 + "%";
-  const pct = turn.hp / HP_MAX;
-  $("hpbar").classList.toggle("mid", pct <= 0.5 && pct >= 0.25);
-  $("hpbar").classList.toggle("low", pct < 0.25);
-  $("hpbar").setAttribute("aria-valuenow", turn.hp);
-  $("hpbar").setAttribute("aria-valuemax", HP_MAX);
-  $("turn").textContent = "Turn " + (index + 1);
-
+  renderHeader(turn.location, turn.hp, HP_MAX, index + 1);
   if (chosenText) story.append(el("p", "chosen", chosenText));
   if (turn.dice) story.append(renderDice(turn.dice));
   for (const para of turn.narration) story.append(el("p", "", para));
-
-  const options = $("options");
-  options.replaceChildren();
-  for (const text of turn.options) {
-    const btn = el("button", "", text);
-    btn.type = "button";
-    btn.addEventListener("click", () => choose(text));
-    options.append(btn);
-  }
+  renderOptions(turn.options, (i, text) => choose(text));
   scrollDown();
 }
 
 function choose(text) {
-  // Fake loop: cycle through the hardcoded turns.
+  if (online()) return;
+  // Offline demo: cycle through the hardcoded turns.
   turnIndex = (turnIndex + 1) % TURNS.length;
   if (turnIndex === 0) addNote("(Fake story ended, looping back to turn 1.)");
   renderTurn(turnIndex, "▸ " + text);
+}
+
+// ---- Online play (backend) ----
+let game = null; // last public state from the server
+let busy = false;
+
+const lsGet = (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
+const lsSet = (k, v) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch {} };
+const online = () => !!(lsGet(LS.server) && lsGet(LS.key));
+
+async function api(path, body) {
+  const res = await fetch(lsGet(LS.server) + path, {
+    method: body ? "POST" : "GET",
+    headers: { "X-Game-Key": lsGet(LS.key), ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+  });
+  let data = null;
+  try { data = await res.json(); } catch {}
+  return { status: res.status, data };
+}
+
+function setBusy(on) {
+  busy = on;
+  for (const b of document.querySelectorAll("#options button, #generic button, #custom button")) b.disabled = on;
+  $("pending")?.remove();
+  if (on) { const p = el("p", "note pending", "The story continues…"); p.id = "pending"; story.append(p); scrollDown(); }
+}
+
+function applyState(state) {
+  game = state;
+  renderHeader(state.location, state.pc.hp, state.pc.hp_max, state.turn);
+  renderOptions(state.scene.options, (i) => act({ kind: "option", index: i }, state.scene.options[i]));
+}
+
+function renderFull(state) {
+  story.replaceChildren();
+  if (!state.recent.length) for (const p of state.scene.narration) story.append(el("p", "", p));
+  else story.append(el("p", "note", "(Earlier scenes are kept in the save.)"));
+  for (const t of state.recent) {
+    story.append(el("p", "chosen", "▸ " + t.action));
+    if (t.dice) story.append(renderDice(t.dice, false));
+    for (const p of t.narration) story.append(el("p", "", p));
+  }
+  applyState(state);
+  scrollDown();
+}
+
+const REASONS = { daily_cap: "Today's spend cap is reached", ai_failed: "The narrator didn't answer", no_api_key: "The server has no API key yet" };
+
+function handleReply(status, data) {
+  if (status === 200 && data?.turn) {
+    const t = data.turn;
+    story.append(el("p", "chosen", "▸ " + t.action));
+    if (t.dice) story.append(renderDice(t.dice));
+    for (const p of t.narration) story.append(el("p", data.fallback ? "note" : "", p));
+    if (data.fallback) story.append(el("p", "note", `(${REASONS[data.reason] || data.reason}. Nothing changed; pick again.)`));
+    applyState(data.state);
+    scrollDown();
+    return true;
+  }
+  if (status === 409 && data?.state) { renderFull(data.state); addNote("(Synced with the saved game.)"); return true; }
+  if (status === 401) { addNote("Server key rejected. Check it in More → Server."); return true; }
+  addNote(`Server error (${status || "no reply"}${data?.error ? ": " + data.error : ""}). Tap to try again.`);
+  return status >= 400 && status < 500; // 4xx: don't resend the same request
+}
+
+async function sendTurn(pending) {
+  setBusy(true);
+  let done = false;
+  try {
+    const { status, data } = await api("/api/turn", pending);
+    done = handleReply(status, data);
+  } catch {
+    addNote("Couldn't reach the server. Tap to try again.");
+  }
+  if (done) lsSet(LS.pending, "");
+  setBusy(false);
+}
+
+function act(action, label) {
+  if (busy || !game) return;
+  const pending = { request_id: crypto.randomUUID?.() || String(Date.now()) + Math.random(), turn: game.turn, action, label };
+  lsSet(LS.pending, JSON.stringify(pending));
+  sendTurn(pending);
+}
+
+async function connect() {
+  const status = $("serverStatus");
+  status.textContent = "Connecting…";
+  try {
+    const { status: code, data } = await api("/api/state");
+    if (code !== 200) { status.textContent = code === 401 ? "Key rejected." : `Error ${code}${data?.error ? ": " + data.error : ""}`; return false; }
+    status.textContent = `Connected · turn ${data.turn}`;
+    renderFull(data);
+    // Resume a turn that was sent but never answered (app closed mid-turn): same request id, so no double turn.
+    let pending = null;
+    try { pending = JSON.parse(lsGet(LS.pending) || "null"); } catch {}
+    if (pending && pending.turn === data.turn) sendTurn(pending);
+    else lsSet(LS.pending, "");
+    return true;
+  } catch {
+    status.textContent = "Couldn't reach the server.";
+    addNote("Couldn't reach the server. Open More → Server to retry.");
+    return false;
+  }
+}
+
+function setupServerForm() {
+  $("serverUrl").value = lsGet(LS.server);
+  $("serverKey").value = lsGet(LS.key);
+  $("serverForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    let url = $("serverUrl").value.trim().replace(/\/+$/, "");
+    if (url && !/^https?:\/\//.test(url)) url = "https://" + url;
+    $("serverUrl").value = url;
+    lsSet(LS.server, url);
+    lsSet(LS.key, $("serverKey").value.trim());
+    document.activeElement?.blur();
+    if (online() && (await connect())) setSheet(false);
+    else if (!online()) $("serverStatus").textContent = "Offline demo (no server set).";
+  });
+  $("newGame").addEventListener("click", async () => {
+    if (!online()) { $("serverStatus").textContent = "Connect to a server first."; return; }
+    if (!confirm("Start a new game? The current run is replaced (one backup is kept on the server).")) return;
+    const { status, data } = await api("/api/new", { confirm: true });
+    if (status === 200) { lsSet(LS.pending, ""); renderFull(data); setSheet(false); }
+    else $("serverStatus").textContent = `Error ${status}`;
+  });
 }
 
 const custom = $("custom");
@@ -188,13 +325,16 @@ function showBuildInfo() {
   ];
   const vh = (u) => { const t = el("div"); t.style.cssText = `position:fixed;visibility:hidden;height:100${u}`; document.body.append(t); const h = Math.round(t.getBoundingClientRect().height); t.remove(); return h; };
   lines.push(`units vh ${vh("vh")} lvh ${vh("lvh")} dvh ${vh("dvh")} svh ${vh("svh")}  html ${document.documentElement.clientHeight}`);
+  lines.push(online() ? `server ${lsGet(LS.server).replace(/^https?:\/\//, "")}` + (game?.spend ? `  spend today $${game.spend.today.toFixed(3)} of $${game.spend.cap}` : "") : "server none (offline demo)");
   $("diag").textContent = lines.join("\n");
 }
 
 
 function useGeneric(label) {
   if (label === "Custom action") { openCustom(); return; }
-  addNote(`[${label}] is not wired up in Phase 1.`);
+  if (online() && label === "Look") { act({ kind: "look" }, "Look around"); return; }
+  if (online() && label === "Talk") { act({ kind: "talk" }, "Talk to someone nearby"); return; }
+  addNote(`[${label}] is not wired up yet.`);
 }
 
 function buildGeneric() {
@@ -246,7 +386,9 @@ custom.addEventListener("submit", (e) => {
   e.preventDefault();
   const text = customText.value.trim();
   closeCustom();
-  if (text) choose(text);
+  if (!text) return;
+  if (online()) act({ kind: "custom", text }, text);
+  else choose(text);
 });
 $("customCancel").addEventListener("click", closeCustom);
 
@@ -255,7 +397,7 @@ if (window.visualViewport) {
   const vv = window.visualViewport;
   const fit = () => {
     // Only shrink for the keyboard while the input is focused; a stray viewport difference must never shorten the layout.
-    const keyboard = document.activeElement === customText && window.innerHeight - vv.height > 80;
+    const keyboard = document.activeElement?.tagName === "INPUT" && window.innerHeight - vv.height > 80;
     const app = document.getElementById("app");
     app.classList.toggle("kb", keyboard);
     app.style.setProperty("--app-h", keyboard ? vv.height + "px" : "");
@@ -263,8 +405,10 @@ if (window.visualViewport) {
   };
   vv.addEventListener("resize", fit);
   vv.addEventListener("scroll", fit);
-  customText.addEventListener("blur", fit);
+  document.addEventListener("focusout", fit);
 }
 
 buildGeneric();
-renderTurn(0);
+setupServerForm();
+if (online()) connect();
+else renderTurn(0);

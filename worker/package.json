@@ -1,0 +1,16 @@
+{
+  "name": "ai-rpg-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.132.1"
+  },
+  "devDependencies": {
+    "wrangler": "4.149.0"
+  }
+}

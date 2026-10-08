@@ -8,8 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AI-RPG">
 <meta name="theme-color" content="#14110f">
-<meta name="build" content="1.7|2026-10-08T22:33Z">
-<link rel="manifest" href="manifest.webmanifest?v=1.7">
+<meta name="build" content="1.8|2026-10-08T22:54Z">
+<link rel="manifest" href="manifest.webmanifest?v=1.8">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <title>AI-RPG</title>
@@ -17,7 +17,7 @@
 // Home Screen app: flag it early so the standalone-only layout rules apply before first paint.
 if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) document.documentElement.classList.add("standalone");
 </script>
-<link rel="stylesheet" href="style.css?v=1.7">
+<link rel="stylesheet" href="style.css?v=1.8">
 </head>
 <body>
 <div class="app" id="app">
@@ -35,7 +35,7 @@ if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) do
     <div class="options" id="options"></div>
     <div class="generic" id="generic"></div>
     <form class="custom" id="custom" hidden>
-      <input id="customText" type="text" placeholder="I try to…" autocomplete="off" enterkeyhint="send">
+      <input id="customText" type="text" placeholder="I try to…" autocomplete="off" enterkeyhint="send" maxlength="300">
       <button type="submit">Go</button>
       <button type="button" id="customCancel" class="ghost">Cancel</button>
     </form>
@@ -48,12 +48,22 @@ if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) do
       <button type="button" class="close" id="sheetClose" aria-label="Close">✕</button>
     </div>
     <div class="sheet-body" id="sheetBody"></div>
+    <form class="server" id="serverForm" autocomplete="off">
+      <div class="label">Server</div>
+      <input id="serverUrl" type="url" inputmode="url" placeholder="https://ai-rpg.….workers.dev" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <input id="serverKey" type="password" placeholder="Game key" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <div class="row">
+        <button type="submit">Connect</button>
+        <button type="button" id="newGame" class="ghost">New game</button>
+      </div>
+      <div class="status" id="serverStatus"></div>
+    </form>
     <div class="sheet-foot">
       <div id="buildStamp"></div>
       <pre id="diag"></pre>
     </div>
   </div>
 </div>
-<script src="app.js?v=1.7"></script>
+<script src="app.js?v=1.8"></script>
 </body>
 </html>

@@ -37,6 +37,9 @@ Background research on existing products and the evidence behind these decisions
 | Map | Text-based location list with connections, no drawn map in v1 |
 | Progression | XP, levels, equipment with stats, loot from code tables |
 | Scope | v1 is frozen (see below). Everything else goes in Later. |
+| Backend | Cloudflare Worker + KV, deployed from GitHub (Workers Builds). Shared game key, $1/day spend cap (DAILY_CAP_USD) |
+| Runtime models | Turns: Sonnet 5.5 at low effort. Summaries: Haiku 5.5. Both are config values |
+| Language | English (stored per save, so German stays possible) |
 
 ## v1 scope (frozen)
 
@@ -221,10 +224,8 @@ Runtime models for the game itself are a separate question (see Open questions a
 
 ## Open questions
 
-- Which model for per-turn calls vs. summary calls vs. milestone graph generation?
-- Backend choice (Cloudflare Worker vs. Vercel)?
+- Which model for milestone graph generation? (Turns and summaries are decided, see Decisions.)
 - How long should the main quest be (number of turns), and how is it paced?
 - Should the character be fully AI-generated at the start or hand-built from a template?
-- Game language: English, German, or a setting? Test narration and option phrasing in the chosen language early.
 - Is the milestone graph generated once by the AI at game start, or picked from a few hand-written templates per setting?
 - Pressure mechanic: supplies and day counter, a threat clock, or neither in v1?

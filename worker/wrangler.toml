@@ -1,0 +1,18 @@
+# AI-RPG backend: protected proxy to the Claude API plus server-side saves.
+# Secrets (ANTHROPIC_API_KEY, GAME_KEY) are set in the Cloudflare dashboard, never here.
+name = "ai-rpg"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Keep variables set in the dashboard (DAILY_CAP_USD, TURN_MODEL, ...) across deploys.
+keep_vars = true
+
+# No id on purpose: Wrangler creates the namespace on the first deploy and reuses it afterwards.
+[[kv_namespaces]]
+binding = "GAME"
+
+[vars]
+ALLOWED_ORIGINS = "https://tomethyy.github.io"
+
+[observability]
+enabled = true
