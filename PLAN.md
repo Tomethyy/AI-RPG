@@ -206,6 +206,8 @@ Runtime models for the game itself are a separate question (see Open questions a
 
 ## Should have (schedule, may slip)
 
+- Ledger duplicate names: the same person can end up as two entities (e.g. "The woman by the hearth", then "Maren" once named). Merge or alias them on rename. Look at it in Phase 4 (retrieval) and measure it in the Phase 8 bot runs; the Codex in Phase 7 gets edit/merge.
+
 - Regenerate narration/options with the dice result kept fixed
 - Pressure on the player: day counter and consumable supplies, or a threat clock on the main quest (needs a decision)
 - Bot-played consistency and cost tests
@@ -217,6 +219,7 @@ Phase 3 shipped a first guess: 3 stats at +0..+2, +1 to the lowest stat per leve
 - Let the player choose which stat gets the level-up point (now automatic).
 - Bot-play XP and level-ups to balance pace: XP per roll, XP per level, how many turns a level takes.
 - Revisit the max level (now 10) and what happens at the cap.
+- Show XP gained in one note per turn (roll XP and the AI's bonus XP are separate lines now, e.g. "+3 XP" then "+2 XP"). Small UI fix, fits Phase 7.
 - Decide what each stat should actually do. Now: might, wits and grit only add to rolls, and combat (Phase 5) will need its own use for them.
 
 ## Later (not in v1)
