@@ -48,7 +48,7 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.5"; // stamped by stamp.py
+const JS_BUILD = "1.6"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Look", "Talk", "Travel", "Rest"];
 const MORE = ["Inventory", "Wildcard", "Custom action"];
@@ -186,7 +186,33 @@ function showBuildInfo() {
     `header title y ${Math.round($("location").getBoundingClientRect().top)}  on top: ${topEl($("location"))} / ${topEl($("hp"))}`,
     `title opacity ${getComputedStyle($("location")).opacity} color ${getComputedStyle($("location")).color}  hp color ${cs.color}`,
   ];
+  const vh = (u) => { const t = el("div"); t.style.cssText = `position:fixed;visibility:hidden;height:100${u}`; document.body.append(t); const h = Math.round(t.getBoundingClientRect().height); t.remove(); return h; };
+  lines.push(`units vh ${vh("vh")} lvh ${vh("lvh")} dvh ${vh("dvh")} svh ${vh("svh")}  html ${document.documentElement.clientHeight}`);
   $("diag").textContent = lines.join("\n");
+}
+
+// On-device layout experiments (temporary): tap one, look at the bottom gap and the header, report which looks right.
+const TESTS = [
+  ["auto", "Height as built"], ["vh", "100vh"], ["lvh", "100lvh"], ["screen", "screen.height"],
+  ["abs", "Not fixed"], ["head16", "Header +16pt"],
+];
+function applyTest(key) {
+  const app = $("app");
+  if (["auto", "vh", "lvh", "screen"].includes(key)) {
+    app.style.bottom = key === "auto" ? "" : "auto";
+    app.style.height = { auto: "", vh: "100vh", lvh: "100lvh", screen: screen.height + "px" }[key];
+    document.querySelectorAll("#tests [data-k]").forEach((b) => { if (["auto", "vh", "lvh", "screen"].includes(b.dataset.k)) b.classList.toggle("on", b.dataset.k === key); });
+  } else {
+    const on = app.classList.toggle(key);
+    document.querySelector(`#tests [data-k="${key}"]`).classList.toggle("on", on);
+  }
+  showBuildInfo();
+}
+for (const [key, label] of TESTS) {
+  const b = el("button", key === "auto" ? "on" : "", label.replace("Height as built", "as built"));
+  b.type = "button"; b.dataset.k = key;
+  b.addEventListener("click", () => applyTest(key));
+  $("tests").append(b);
 }
 
 function useGeneric(label) {
