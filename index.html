@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#14110f">
+<title>Solo RPG</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <span class="title" id="location">The Rusted Ford</span>
+    <span class="stats"><span id="hp">HP 18/20</span> · <span id="turn">Turn 1</span></span>
+  </header>
+
+  <main class="story" id="story" aria-live="polite"></main>
+
+  <footer class="actions">
+    <div class="options" id="options"></div>
+    <div class="generic" id="generic"></div>
+  </footer>
+
+  <form class="custom" id="custom" hidden>
+    <input id="customText" type="text" placeholder="I try to…" autocomplete="off" enterkeyhint="send">
+    <button type="submit">Go</button>
+    <button type="button" id="customCancel" class="ghost">Cancel</button>
+  </form>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
