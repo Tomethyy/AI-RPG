@@ -178,12 +178,12 @@ The AI has no memory. The app stores everything and rebuilds a compact prompt ev
 
 1. **Skeleton:** Story screen with a hardcoded fake turn, fake dice display, fake options. Get the mobile layout right on the phone. Decide here whether the loop feels good.
 2. **Backend and schema:** protected proxy (Cloudflare Worker or Vercel function), spend cap, server-side save, memory schema (state, summary, ledger, milestone graph). One real AI turn, JSON validation with retry, the turn writes to the ledger.
-3. **Rules engine:** dice, HP, XP and levels, equipment, loot tables, difficulty clamps, visible dice, state persistence.
+3. **Rules engine:** dice, HP, XP and levels, equipment, loot tables, difficulty clamps, visible dice, state persistence. Start with a small read-only Ledger view in the More sheet (entities and their facts, no AI call) so the memory can be checked while playing.
 4. **Retrieval and prompt assembly:** token budget per section, rolling summary, ledger retrieval, last-N turns, option variety, prompt caching of the static prefix, debug view of the assembled prompt.
 5. **Combat:** code-resolved rounds, combat log, one AI summary call, permanent death and epilogue.
 6. **Quest structure:** milestone graph generation, quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
-7. **Map and polish:** text map and Travel, rest with random events, generic buttons, character screen, journal, new game flow, export/import, home screen icon.
-8. **Tuning:** bot-played test runs of 100+ turns logging tokens per turn, contradictions against the ledger, option repetition and difficulty distribution. Try a cheaper model. Add regenerate-with-fixed-dice, a Codex screen to view and edit ledger facts, and a pressure mechanic if the loop feels too safe.
+7. **Map and polish:** text map and Travel, rest with random events, generic buttons, character screen, journal, Codex (known NPCs, places, factions, items with their facts; edit and delete), new game flow, export/import, home screen icon.
+8. **Tuning:** bot-played test runs of 100+ turns logging tokens per turn, contradictions against the ledger, option repetition and difficulty distribution. Try a cheaper model. Add regenerate-with-fixed-dice and a pressure mechanic if the loop feels too safe.
 
 ## Model and effort per phase
 
@@ -207,7 +207,6 @@ Runtime models for the game itself are a separate question (see Open questions a
 ## Should have (schedule, may slip)
 
 - Regenerate narration/options with the dice result kept fixed
-- Codex screen: list ledger entities and facts, edit and delete
 - Pressure on the player: day counter and consumable supplies, or a threat clock on the main quest (needs a decision)
 - Bot-played consistency and cost tests
 
