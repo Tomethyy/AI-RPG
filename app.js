@@ -4,7 +4,7 @@
 const TURNS = [
   {
     location: "The Rusted Ford",
-    hp: "HP 18/20",
+    hp: 18,
     narration: [
       "Rain hammers the old toll house as you shoulder through the door. Inside, a handful of drovers hunch over cold stew, and nobody looks up. The bridge outside is gone; only blackened stumps remain in the river.",
       "A woman by the hearth is sewing a seal onto a leather satchel. She notices your mud-caked boots and finally meets your eye.",
@@ -18,7 +18,7 @@ const TURNS = [
   },
   {
     location: "The Rusted Ford",
-    hp: "HP 18/20",
+    hp: 18,
     dice: { die: 14, label: "Wits", mod: 2, dc: 12, success: true },
     narration: [
       "The woman gives her name as Maren and sets the satchel aside. \"Burned three nights ago,\" she says. \"Whoever did it wanted the road closed, not the river crossed.\"",
@@ -33,7 +33,7 @@ const TURNS = [
   },
   {
     location: "The Rusted Ford",
-    hp: "HP 15/20",
+    hp: 15,
     dice: { die: 4, label: "Grit", mod: 1, dc: 13, success: false },
     narration: [
       "You reach for the satchel and the nearest drover catches your wrist. A short scuffle follows; you come away with a split lip and a bruised pride, but the satchel stays where it was.",
@@ -48,7 +48,9 @@ const TURNS = [
   },
 ];
 
-const GENERIC = ["Look around", "Talk to someone", "Travel", "Rest", "Inventory", "Wildcard", "Custom action"];
+const HP_MAX = 20;
+const GENERIC = ["Look", "Talk", "Travel", "Rest"];
+const MORE = ["Inventory", "Wildcard", "Custom action"];
 
 const $ = (id) => document.getElementById(id);
 const story = $("story");
@@ -86,7 +88,11 @@ function renderDice(d) {
 function renderTurn(index, chosenText) {
   const turn = TURNS[index];
   $("location").textContent = turn.location;
-  $("hp").textContent = turn.hp;
+  $("hp").textContent = `HP ${turn.hp}/${HP_MAX}`;
+  $("hpfill").style.width = (turn.hp / HP_MAX) * 100 + "%";
+  $("hpbar").classList.toggle("low", turn.hp / HP_MAX <= 0.3);
+  $("hpbar").setAttribute("aria-valuenow", turn.hp);
+  $("hpbar").setAttribute("aria-valuemax", HP_MAX);
   $("turn").textContent = "Turn " + (index + 1);
 
   if (chosenText) story.append(el("p", "chosen", chosenText));
@@ -113,20 +119,51 @@ function choose(text) {
 
 const custom = $("custom");
 const customText = $("customText");
+const generic = $("generic");
+const sheet = $("sheet");
+const backdrop = $("backdrop");
 
-function closeCustom() { custom.hidden = true; customText.value = ""; }
+// The custom input takes the generic row's slot; the options above stay visible and untouched.
+function openCustom() {
+  generic.hidden = true;
+  custom.hidden = false;
+  customText.focus();
+}
+function closeCustom() {
+  custom.hidden = true;
+  generic.hidden = false;
+  customText.value = "";
+  customText.blur();
+}
+
+function setSheet(open) {
+  sheet.hidden = backdrop.hidden = !open;
+}
+
+function useGeneric(label) {
+  if (label === "Custom action") { openCustom(); return; }
+  addNote(`[${label}] is not wired up in Phase 1.`);
+}
 
 function buildGeneric() {
-  const box = $("generic");
   for (const label of GENERIC) {
     const btn = el("button", "", label);
     btn.type = "button";
-    btn.addEventListener("click", () => {
-      if (label === "Custom action") { custom.hidden = false; customText.focus(); return; }
-      addNote(`[${label}] is not wired up in Phase 1.`);
-    });
-    box.append(btn);
+    btn.addEventListener("click", () => useGeneric(label));
+    generic.append(btn);
   }
+  const more = el("button", "", "More");
+  more.type = "button";
+  more.addEventListener("click", () => setSheet(true));
+  generic.append(more);
+
+  for (const label of MORE) {
+    const btn = el("button", "", label);
+    btn.type = "button";
+    btn.addEventListener("click", () => { setSheet(false); useGeneric(label); });
+    sheet.append(btn);
+  }
+  backdrop.addEventListener("click", () => setSheet(false));
 }
 
 custom.addEventListener("submit", (e) => {
@@ -136,6 +173,18 @@ custom.addEventListener("submit", (e) => {
   if (text) choose(text);
 });
 $("customCancel").addEventListener("click", closeCustom);
+
+// iOS keeps the layout viewport full height when the keyboard opens, so size the app to the visible area.
+if (window.visualViewport) {
+  const vv = window.visualViewport;
+  const fit = () => {
+    const keyboard = window.innerHeight - vv.height > 80;
+    document.getElementById("app").style.setProperty("--app-h", keyboard ? vv.height + "px" : "");
+    if (keyboard) window.scrollTo(0, 0);
+  };
+  vv.addEventListener("resize", fit);
+  vv.addEventListener("scroll", fit);
+}
 
 buildGeneric();
 renderTurn(0);
