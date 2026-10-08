@@ -1,5 +1,5 @@
 // Story screen. Online: turns come from the backend (More → Server). Offline: the Phase 1 hardcoded demo below.
-// Dice are placeholders until the Phase 3 rules engine.
+// Online, dice and rules come from the server (Phase 3); the offline demo uses fixed fake dice.
 
 const TURNS = [
   {
@@ -48,10 +48,10 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.12"; // stamped by stamp.py
+const JS_BUILD = "1.13"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Look", "Talk", "Travel", "Rest"];
-const MORE = ["Inventory", "Wildcard", "Custom action"];
+const MORE = ["Ledger", "Inventory", "Wildcard", "Custom action"];
 const LS = { server: "rpg.server", key: "rpg.key", pending: "rpg.pending" };
 
 const $ = (id) => document.getElementById(id);
@@ -82,6 +82,7 @@ function renderDice(d, animate = true) {
   const result = el("div", "result " + (d.success ? "success" : "fail"), d.success ? "Success" : "Failure");
   math.innerHTML = `d20 <b>${d.die}</b> + ${d.label} <b>${d.mod >= 0 ? "+" : ""}${d.mod}</b> = <b>${total}</b> vs DC <b>${d.dc}</b><br>`;
   math.append(result);
+  if (d.note) math.append(el("div", "dice-note", d.note));
   box.append(die, math);
   if (animate) setTimeout(() => { die.textContent = d.die; die.classList.remove("rolling"); }, 500);
   return box;
@@ -182,6 +183,7 @@ function handleReply(status, data) {
     story.append(el("p", "chosen", "▸ " + t.action));
     if (t.dice) story.append(renderDice(t.dice));
     for (const p of t.narration) story.append(el("p", data.fallback ? "note" : "", p));
+    for (const e of data.events || []) story.append(el("p", "note", e));
     if (data.fallback) story.append(el("p", "note", `(${REASONS[data.reason] || data.reason}. Nothing changed; pick again.)` + (data.detail ? ` [${data.detail}]` : "")));
     applyState(data.state);
     scrollDown();
@@ -279,6 +281,7 @@ function closeCustom() {
 function setSheet(open) {
   sheet.hidden = backdrop.hidden = !open;
   sheet.style.transform = "";
+  if (!open) showLedger(false);
   if (open) showBuildInfo();
 }
 
@@ -330,7 +333,55 @@ function showBuildInfo() {
 }
 
 
+// ---- Ledger (read-only view of what the app remembers; no AI call) ----
+const TYPE_TITLES = { npc: "People", location: "Places", faction: "Factions", item: "Items", quest: "Quests", lore: "Lore" };
+
+function ledgerLine(label, text) {
+  const p = el("p", "ledger-line");
+  p.append(el("b", "", label + " "), document.createTextNode(text));
+  return p;
+}
+
+function showLedger(on) {
+  $("ledger").hidden = !on;
+  $("sheetBody").hidden = on;
+  $("serverForm").hidden = on;
+}
+
+async function openLedger() {
+  const body = $("ledgerBody");
+  body.replaceChildren(el("p", "note", "Loading…"));
+  showLedger(true);
+  if (!online()) { body.replaceChildren(el("p", "note", "The ledger lives on the server. Go back and connect a server first.")); return; }
+  try {
+    const { status, data } = await api("/api/ledger");
+    if (status !== 200) { body.replaceChildren(el("p", "note", `Couldn't load the ledger (${status}).`)); return; }
+    body.replaceChildren();
+    const pc = game?.pc;
+    if (pc?.stats) {
+      const eq = Object.values(pc.equipment || {}).map((g) => g.name).join(", ") || "nothing";
+      const st = `Might ${pc.stats.might}, Wits ${pc.stats.wits}, Grit ${pc.stats.grit}`;
+      body.append(ledgerLine(`${pc.name} · Level ${pc.level}`, `XP ${pc.xp}${pc.xp_next ? "/" + pc.xp_next : ""} · ${st} · Gear: ${eq}${pc.conditions.length ? " · " + pc.conditions.join(", ") : ""}`));
+    }
+    body.append(el("p", "note", `Turn ${data.turn} · now at ${data.here}`));
+    let last = "";
+    for (const e of data.entities) {
+      if (e.type !== last) { body.append(el("h3", "", TYPE_TITLES[e.type] || e.type)); last = e.type; }
+      const card = el("div", "ledger-entity");
+      card.append(el("div", "ledger-name", e.name));
+      const meta = [e.where && `at ${e.where}`, e.links.length && `links: ${e.links.join(", ")}`].filter(Boolean).join(" · ");
+      if (meta) card.append(el("div", "ledger-meta", meta));
+      for (const f of e.facts) card.append(el("div", "ledger-fact", "• " + f));
+      body.append(card);
+    }
+    if (!data.entities.length) body.append(el("p", "note", "Nothing recorded yet."));
+  } catch {
+    body.replaceChildren(el("p", "note", "Couldn't reach the server."));
+  }
+}
+
 function useGeneric(label) {
+  if (label === "Ledger") { openLedger(); return; }
   if (label === "Custom action") { openCustom(); return; }
   if (online() && label === "Look") { act({ kind: "look" }, "Look around"); return; }
   if (online() && label === "Talk") { act({ kind: "talk" }, "Talk to someone nearby"); return; }
@@ -352,11 +403,12 @@ function buildGeneric() {
   for (const label of MORE) {
     const btn = el("button", "", label);
     btn.type = "button";
-    btn.addEventListener("click", () => { setSheet(false); useGeneric(label); });
+    btn.addEventListener("click", () => { if (label !== "Ledger") setSheet(false); useGeneric(label); });
     $("sheetBody").append(btn);
   }
   backdrop.addEventListener("click", () => setSheet(false));
   $("sheetClose").addEventListener("click", () => setSheet(false));
+  $("ledgerBack").addEventListener("click", () => showLedger(false));
 
   // Drag the handle area down to dismiss.
   const head = $("sheetHead");

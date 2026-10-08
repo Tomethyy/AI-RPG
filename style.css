@@ -8,7 +8,7 @@
   --accent: #d9a441;
   --good: #7fb069;
   --bad: #d96459;
-  --build: "1.12";
+  --build: "1.13";
   color-scheme: dark;
 }
 
@@ -157,3 +157,16 @@ body { font: 17px/1.5 Georgia, "Iowan Old Style", serif; overscroll-behavior: no
 
 button { font-family: inherit; cursor: pointer; }
 button:disabled { opacity: 0.4; }
+
+/* Ledger view inside the More sheet (read-only; the sheet itself scrolls). */
+.ledger { display: grid; gap: 6px; }
+.ledger[hidden], .sheet-body[hidden], .server[hidden] { display: none; }
+.ledger h3 { margin: 10px 0 2px; font-size: 13px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }
+.ledger-entity { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.ledger-name { font-size: 15px; font-weight: 600; color: var(--text); }
+.ledger-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.ledger-fact { font-size: 13.5px; line-height: 1.35; color: var(--text); margin-top: 3px; }
+.ledger-line { margin: 0; font-size: 13.5px; line-height: 1.4; color: var(--text); }
+.ledger .note { margin: 0; font-size: 13px; color: var(--muted); }
+.sheet button.ghost { background: transparent; color: var(--muted); }
+.dice-note { font-size: 12px; color: var(--muted); margin-top: 2px; }

@@ -18,7 +18,7 @@ function turnJSON() {
       { text: `Push past the drovers ${n}`, kind: "direct", stat: "might", difficulty: 13 },
     ],
     classification: "allowed",
-    state_changes: n === 2 ? [{ actor: "pc", kind: "move", amount: 0, text: "Gull's Landing", reason: "walked there" }, { actor: "nobody", kind: "hp", amount: -3, text: "", reason: "x" }] : [{ actor: "pc", kind: "hp", amount: -2, text: "", reason: "scuffle" }],
+    state_changes: n % 3 === 0 ? [{ actor: "pc", kind: "item_add", amount: 1, text: "Iron dagger", reason: "found" }, { actor: "pc", kind: "xp", amount: 9, text: "", reason: "clever" }] : n === 2 ? [{ actor: "pc", kind: "move", amount: 0, text: "Gull's Landing", reason: "walked there" }, { actor: "nobody", kind: "hp", amount: -3, text: "", reason: "x" }] : [{ actor: "pc", kind: "hp", amount: -2, text: "", reason: "scuffle" }],
     new_facts: [
       { entity: "Maren", type: "npc", fact: "Sews seals onto satchels", location: "The Rusted Ford" },
       { entity: "Gull's Landing", type: "location", fact: "A ferry landing downriver", location: "The Rusted Ford" },

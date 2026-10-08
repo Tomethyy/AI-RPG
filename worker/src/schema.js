@@ -13,15 +13,18 @@
 //   summary: { text, through_turn },                  rolling summary (written from Phase 4 on)
 //   recent: [TurnRecord],         last RECENT_TURNS turns verbatim
 //   last: { request_id, response } | null,           idempotency: a repeated request gets the stored reply
-//   counters: { ai_turns, fallbacks, retries },
+//   counters: { ai_turns, fallbacks, retries, dc{final difficulty: count}, dc_clamped },
 // }
 // Actor:  { id, kind: "pc"|"companion", name, ledger_id, level, xp, hp, hp_max, stats{might,wits,grit},
 //           equipment{slot: item}, inventory[{id,name,qty,note}], conditions[] }
-// Entity: { id, type, name, aliases[], location_id, connections[], facts[{text,turn}], first_turn, last_turn }
+// Entity: { id, type, name, aliases[], location_id, connections[], facts[{text,turn}], first_turn, last_turn, danger (locations only, 0-2, set by code) }
+// Gear:   { id, name, slot: "weapon"|"armor", rarity, bonus_stat, damage+mult (weapons) | defense (armor) }. Inventory gear carries it in `gear`.
 // Milestone: { id, title, conditions[], status: "undiscovered"|"ongoing"|"completed", next[] }
 // Every turn also goes to an archive in chunks: "arc:<game id>:<n>" = [TurnRecord] (ARCHIVE_CHUNK per key).
 
-export const SCHEMA_VERSION = 1;
+import { ensureGearStats, rollDanger, xpForLevel } from "./rules.js";
+
+export const SCHEMA_VERSION = 2;
 export const STATS = ["might", "wits", "grit"];
 export const ENTITY_TYPES = ["npc", "location", "faction", "item", "quest", "lore"];
 export const OPTION_KINDS = ["social", "explore", "direct", "cautious", "other"];
@@ -109,15 +112,17 @@ export function newGame(slot = "main", now = new Date().toISOString()) {
     summary: { text: "", through_turn: 0 },
     recent: [],
     last: null,
-    counters: { ai_turns: 0, fallbacks: 0, retries: 0 },
+    counters: { ai_turns: 0, fallbacks: 0, retries: 0, dc: {}, dc_clamped: 0 },
   };
   save.ledger.entities[ford] = newEntity(ford, "location", "The Rusted Ford", 1, {
     aliases: ["Rusted Ford", "toll house"],
+    danger: 0,
     facts: [
       { text: "An old toll house on the river road", turn: 1 },
       { text: "The bridge was burned; only blackened stumps remain", turn: 1 },
     ],
   });
+  for (const [slot, item] of Object.entries(save.actors.pc.equipment)) ensureGearStats(item, slot);
   return save;
 }
 
@@ -125,7 +130,13 @@ export function newGame(slot = "main", now = new Date().toISOString()) {
 export function migrate(save) {
   if (!save || typeof save !== "object") throw new Error("bad save");
   if (save.v > SCHEMA_VERSION) throw new Error(`save v${save.v} is newer than this server (v${SCHEMA_VERSION})`);
-  // v1 is the first version: nothing to upgrade yet.
+  if (save.v < 2) {
+    // v2: rules engine. Gear stats, location danger, difficulty log.
+    for (const a of Object.values(save.actors)) for (const [slot, item] of Object.entries(a.equipment)) ensureGearStats(item, slot);
+    for (const e of Object.values(save.ledger.entities)) if (e.type === "location" && e.danger === undefined) e.danger = e.id === "location-the-rusted-ford" ? 0 : rollDanger(save, e.id);
+    save.counters.dc ??= {};
+    save.counters.dc_clamped ??= 0;
+  }
   save.v = SCHEMA_VERSION;
   return save;
 }
@@ -144,9 +155,18 @@ export function publicState(save, extra = {}) {
   return {
     turn: save.turn,
     location: locationName(save, save.scene.location_id),
-    pc: { name: p.name, hp: p.hp, hp_max: p.hp_max, level: p.level, xp: p.xp },
+    pc: { name: p.name, hp: p.hp, hp_max: p.hp_max, level: p.level, xp: p.xp, xp_next: p.level >= 10 ? null : xpForLevel(p.level + 1), stats: p.stats, equipment: p.equipment, inventory: p.inventory.map((i) => ({ name: i.name, qty: i.qty })), conditions: p.conditions },
     scene: { narration: save.scene.narration, options: save.scene.options.map((o) => o.text) },
     recent: save.recent.map((t) => ({ n: t.n, action: t.action.text, dice: t.dice, narration: t.narration })),
     ...extra,
   };
+}
+
+// Read-only view of the lore ledger for the Ledger screen: what the app remembers, no AI involved.
+export function ledgerView(save) {
+  const name = (id) => save.ledger.entities[id]?.name;
+  const entities = Object.values(save.ledger.entities)
+    .map((e) => ({ type: e.type, name: e.name, where: e.type === "location" ? undefined : name(e.location_id), links: e.connections.map(name).filter(Boolean), facts: e.facts.map((f) => f.text), last_turn: e.last_turn }))
+    .sort((a, b) => ENTITY_TYPES.indexOf(a.type) - ENTITY_TYPES.indexOf(b.type) || a.name.localeCompare(b.name));
+  return { turn: save.turn, here: name(save.scene.location_id), entities };
 }

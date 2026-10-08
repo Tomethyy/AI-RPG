@@ -1,7 +1,8 @@
 // AI-RPG backend (Cloudflare Worker): shared-secret proxy to the Claude API, daily spend cap, server-side save.
-import { newGame, migrate, publicState, pc, RECENT_TURNS, ARCHIVE_CHUNK } from "./schema.js";
+import { newGame, migrate, publicState, ledgerView, RECENT_TURNS, ARCHIVE_CHUNK } from "./schema.js";
 import { applyNewFacts, ensureLocation } from "./ledger.js";
 import { runTurn, fallbackTurn } from "./ai.js";
+import { rollOption, applyChanges, logDifficulty } from "./rules.js";
 
 const SERVER_VERSION = 1;
 const MAX_BODY = 4096; // bytes; a turn request is a few hundred
@@ -74,14 +75,6 @@ async function stateWithSpend(env, save) {
   return publicState(save, { spend: { today: Math.round((await getSpend(env)) * 10000) / 10000, cap: capUSD(env) }, server: SERVER_VERSION });
 }
 
-// Placeholder roll until the Phase 3 rules engine (unseeded, no difficulty clamp).
-function placeholderRoll(save, option) {
-  const die = 1 + Math.floor(Math.random() * 20);
-  const mod = pc(save).stats[option.stat] || 0;
-  const label = option.stat[0].toUpperCase() + option.stat.slice(1);
-  return { die, mod, label, dc: option.difficulty, success: die + mod >= option.difficulty, placeholder: true };
-}
-
 function resolveAction(save, a) {
   if (!a || typeof a !== "object") return null;
   if (a.kind === "option") {
@@ -110,7 +103,8 @@ async function handleTurn(request, env) {
 
   const action = resolveAction(save, body.action);
   if (!action) return json({ error: "bad_action" }, 400);
-  const dice = action.option ? placeholderRoll(save, action.option) : null;
+  // Seeded by game, turn and option: a retried or resumed turn rolls the same die.
+  const dice = action.option ? rollOption(save, action.option) : null;
 
   const fallback = async (reason, detail) => {
     save.counters.fallbacks++;
@@ -130,8 +124,9 @@ async function handleTurn(request, env) {
 
   const t = result.turn;
   const n = save.turn + 1;
-  // Code owns state. Phase 2 applies only location moves; the rest is stored as proposals for the Phase 3 rules engine.
-  const changes = t.state_changes.map((c) => {
+  // Code owns state: the rules engine validates every proposed change; only the location move needs the ledger.
+  const { changes: checked, events } = applyChanges(save, t.state_changes, dice);
+  const changes = checked.map((c) => {
     if (c.kind === "move" && c.text) {
       const from = save.ledger.entities[save.scene.location_id];
       const to = ensureLocation(save, c.text, n);
@@ -142,15 +137,16 @@ async function handleTurn(request, env) {
       save.scene.location_id = to.id;
       return { ...c, applied: true };
     }
-    return { ...c, applied: false };
+    return c.kind === "move" ? { ...c, applied: false } : c;
   });
+  logDifficulty(save, dice);
   const factsAdded = applyNewFacts(save, t.new_facts, n);
 
   const record = {
     n, ts: new Date().toISOString(),
     action: { kind: action.kind, text: action.text }, dice,
     narration: t.narration, options: t.options,
-    classification: t.classification, state_changes: changes, new_facts: t.new_facts, quest_flags: t.quest_flags,
+    classification: t.classification, state_changes: changes, events, new_facts: t.new_facts, quest_flags: t.quest_flags,
     location_id: save.scene.location_id,
     model: result.model, attempts: result.attempts, usage: result.usage, cost: result.cost,
   };
@@ -160,7 +156,7 @@ async function handleTurn(request, env) {
   save.counters.ai_turns++;
   save.counters.retries += result.attempts - 1;
 
-  const response = { turn: { n, action: action.text, dice, narration: t.narration }, facts_added: factsAdded, state: await stateWithSpend(env, save) };
+  const response = { turn: { n, action: action.text, dice, narration: t.narration }, facts_added: factsAdded, events, state: await stateWithSpend(env, save) };
   save.last = { request_id: requestId, response };
   await archiveTurn(env, save, record);
   await storeSave(env, save);
@@ -180,6 +176,10 @@ async function route(request, env) {
     let save = await loadSave(env);
     if (!save) await storeSave(env, (save = newGame(SLOT)));
     return json(await stateWithSpend(env, save));
+  }
+  if (pathname === "/api/ledger" && request.method === "GET") {
+    const save = (await loadSave(env)) || newGame(SLOT);
+    return json(ledgerView(save));
   }
   if (pathname === "/api/turn" && request.method === "POST") return handleTurn(request, env);
   if (pathname === "/api/new" && request.method === "POST") {

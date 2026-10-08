@@ -12,6 +12,8 @@ Secrets live only in the Cloudflare dashboard (Worker → Settings → Variables
 `ANTHROPIC_API_KEY`, `GAME_KEY` (and `ANTHROPIC_WORKSPACE_ID` only if the API key is not tied to a workspace). Optional plain variables: `DAILY_CAP_USD` (default 1),
 `TURN_MODEL` (default claude-sonnet-5-5), `TURN_EFFORT` (default low).
 
+Rules (Phase 3) live in `worker/src/rules.js`: seeded d20 (one die per game+turn, so retries never reroll), difficulty clamp by level and location danger, XP/levels, gear and loot tables, validation of the AI's proposed state changes. More → Ledger shows the memory read-only (`GET /api/ledger`).
+
 Before each deploy run `python3 stamp.py` (stamps build number and time into index.html, style.css and app.js; shown in the More sheet).
 
 Local testing without spending credit: `cd worker && npm install && npm test`; for a full loop,

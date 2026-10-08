@@ -8,8 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AI-RPG">
 <meta name="theme-color" content="#14110f">
-<meta name="build" content="1.12|2026-10-08T23:34Z">
-<link rel="manifest" href="manifest.webmanifest?v=1.12">
+<meta name="build" content="1.13|2026-10-08T23:43Z">
+<link rel="manifest" href="manifest.webmanifest?v=1.13">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <title>AI-RPG</title>
@@ -17,7 +17,7 @@
 // Home Screen app: flag it early so the standalone-only layout rules apply before first paint.
 if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) document.documentElement.classList.add("standalone");
 </script>
-<link rel="stylesheet" href="style.css?v=1.12">
+<link rel="stylesheet" href="style.css?v=1.13">
 </head>
 <body>
 <div class="app" id="app">
@@ -48,6 +48,10 @@ if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) do
       <button type="button" class="close" id="sheetClose" aria-label="Close">✕</button>
     </div>
     <div class="sheet-body" id="sheetBody"></div>
+    <div class="ledger" id="ledger" hidden>
+      <button type="button" id="ledgerBack" class="ghost">‹ Back</button>
+      <div id="ledgerBody"></div>
+    </div>
     <form class="server" id="serverForm" autocomplete="off">
       <div class="label">Server</div>
       <input id="serverUrl" type="url" inputmode="url" placeholder="https://ai-rpg.….workers.dev" autocapitalize="off" autocorrect="off" spellcheck="false">
@@ -64,6 +68,6 @@ if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) do
     </div>
   </div>
 </div>
-<script src="app.js?v=1.12"></script>
+<script src="app.js?v=1.13"></script>
 </body>
 </html>

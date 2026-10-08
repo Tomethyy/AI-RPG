@@ -1,5 +1,6 @@
 // Lore ledger: every named thing the AI invents becomes an entity record with facts.
 import { ENTITY_TYPES, newEntity, slugify } from "./schema.js";
+import { rollDanger } from "./rules.js";
 
 const norm = (s) => String(s || "").toLowerCase().replace(/^(the|a|an)\s+/, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
@@ -20,7 +21,9 @@ function createEntity(save, type, name, turn) {
   const base = `${type}-${slugify(name)}`;
   let id = base;
   for (let i = 2; save.ledger.entities[id]; i++) id = `${base}-${i}`;
-  return (save.ledger.entities[id] = newEntity(id, type, String(name).trim().slice(0, 80), turn));
+  const e = (save.ledger.entities[id] = newEntity(id, type, String(name).trim().slice(0, 80), turn));
+  if (type === "location") e.danger = rollDanger(save, id);
+  return e;
 }
 
 export function ensureLocation(save, name, turn) {
