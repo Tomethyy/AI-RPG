@@ -48,10 +48,11 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.13"; // stamped by stamp.py
+const JS_BUILD = "1.15"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Look", "Talk", "Travel", "Rest"];
 const MORE = ["Ledger", "Inventory", "Wildcard", "Custom action"];
+const DEFAULT_SERVER = "https://ai-rpg.mr-tom-richter.workers.dev"; // not a secret; the game key is typed in on the phone
 const LS = { server: "rpg.server", key: "rpg.key", pending: "rpg.pending" };
 
 const $ = (id) => document.getElementById(id);
@@ -135,10 +136,11 @@ let busy = false;
 
 const lsGet = (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 const lsSet = (k, v) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch {} };
-const online = () => !!(lsGet(LS.server) && lsGet(LS.key));
+const serverUrl = () => lsGet(LS.server) || DEFAULT_SERVER;
+const online = () => !!(serverUrl() && lsGet(LS.key));
 
 async function api(path, body) {
-  const res = await fetch(lsGet(LS.server) + path, {
+  const res = await fetch(serverUrl() + path, {
     method: body ? "POST" : "GET",
     headers: { "X-Game-Key": lsGet(LS.key), ...(body ? { "Content-Type": "application/json" } : {}) },
     body: body ? JSON.stringify(body) : undefined,
@@ -237,7 +239,7 @@ async function connect() {
 }
 
 function setupServerForm() {
-  $("serverUrl").value = lsGet(LS.server);
+  $("serverUrl").value = serverUrl();
   $("serverKey").value = lsGet(LS.key);
   $("serverForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -328,7 +330,7 @@ function showBuildInfo() {
   ];
   const vh = (u) => { const t = el("div"); t.style.cssText = `position:fixed;visibility:hidden;height:100${u}`; document.body.append(t); const h = Math.round(t.getBoundingClientRect().height); t.remove(); return h; };
   lines.push(`units vh ${vh("vh")} lvh ${vh("lvh")} dvh ${vh("dvh")} svh ${vh("svh")}  html ${document.documentElement.clientHeight}`);
-  lines.push(online() ? `server ${lsGet(LS.server).replace(/^https?:\/\//, "")}` + (game?.spend ? `  spend today $${game.spend.today.toFixed(3)} of $${game.spend.cap}` : "") : "server none (offline demo)");
+  lines.push(online() ? `server ${serverUrl().replace(/^https?:\/\//, "")}` + (game?.spend ? `  spend today $${game.spend.today.toFixed(3)} of $${game.spend.cap}` : "") : "server none (offline demo)");
   $("diag").textContent = lines.join("\n");
 }
 
