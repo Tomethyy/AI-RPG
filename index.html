@@ -35,7 +35,13 @@
   </footer>
 
   <div class="backdrop" id="backdrop" hidden></div>
-  <div class="sheet" id="sheet" role="dialog" aria-label="More actions" hidden></div>
+  <div class="sheet" id="sheet" role="dialog" aria-label="More actions" hidden>
+    <div class="sheet-head" id="sheetHead">
+      <div class="handle"></div>
+      <button type="button" class="close" id="sheetClose" aria-label="Close">✕</button>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
 </div>
 <script src="app.js"></script>
 </body>

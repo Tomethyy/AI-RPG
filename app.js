@@ -90,7 +90,9 @@ function renderTurn(index, chosenText) {
   $("location").textContent = turn.location;
   $("hp").textContent = `HP ${turn.hp}/${HP_MAX}`;
   $("hpfill").style.width = (turn.hp / HP_MAX) * 100 + "%";
-  $("hpbar").classList.toggle("low", turn.hp / HP_MAX <= 0.3);
+  const pct = turn.hp / HP_MAX;
+  $("hpbar").classList.toggle("mid", pct <= 0.5 && pct >= 0.25);
+  $("hpbar").classList.toggle("low", pct < 0.25);
   $("hpbar").setAttribute("aria-valuenow", turn.hp);
   $("hpbar").setAttribute("aria-valuemax", HP_MAX);
   $("turn").textContent = "Turn " + (index + 1);
@@ -138,6 +140,7 @@ function closeCustom() {
 
 function setSheet(open) {
   sheet.hidden = backdrop.hidden = !open;
+  sheet.style.transform = "";
 }
 
 function useGeneric(label) {
@@ -161,9 +164,33 @@ function buildGeneric() {
     const btn = el("button", "", label);
     btn.type = "button";
     btn.addEventListener("click", () => { setSheet(false); useGeneric(label); });
-    sheet.append(btn);
+    $("sheetBody").append(btn);
   }
   backdrop.addEventListener("click", () => setSheet(false));
+  $("sheetClose").addEventListener("click", () => setSheet(false));
+
+  // Drag the handle area down to dismiss.
+  const head = $("sheetHead");
+  let startY = null;
+  head.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button")) return;
+    startY = e.clientY;
+    head.setPointerCapture(e.pointerId);
+    sheet.classList.add("dragging");
+  });
+  head.addEventListener("pointermove", (e) => {
+    if (startY === null) return;
+    sheet.style.transform = `translateY(${Math.max(0, e.clientY - startY)}px)`;
+  });
+  const endDrag = (e) => {
+    if (startY === null) return;
+    const dy = e.clientY - startY;
+    startY = null;
+    sheet.classList.remove("dragging");
+    if (dy > 70) setSheet(false); else sheet.style.transform = "";
+  };
+  head.addEventListener("pointerup", endDrag);
+  head.addEventListener("pointercancel", endDrag);
 }
 
 custom.addEventListener("submit", (e) => {
@@ -179,7 +206,9 @@ if (window.visualViewport) {
   const vv = window.visualViewport;
   const fit = () => {
     const keyboard = window.innerHeight - vv.height > 80;
-    document.getElementById("app").style.setProperty("--app-h", keyboard ? vv.height + "px" : "");
+    const app = document.getElementById("app");
+    app.classList.toggle("kb", keyboard);
+    app.style.setProperty("--app-h", keyboard ? vv.height + "px" : "");
     if (keyboard) window.scrollTo(0, 0);
   };
   vv.addEventListener("resize", fit);
