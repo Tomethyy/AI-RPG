@@ -48,7 +48,7 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.9"; // stamped by stamp.py
+const JS_BUILD = "1.10"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Look", "Talk", "Travel", "Rest"];
 const MORE = ["Inventory", "Wildcard", "Custom action"];
@@ -182,7 +182,7 @@ function handleReply(status, data) {
     story.append(el("p", "chosen", "▸ " + t.action));
     if (t.dice) story.append(renderDice(t.dice));
     for (const p of t.narration) story.append(el("p", data.fallback ? "note" : "", p));
-    if (data.fallback) story.append(el("p", "note", `(${REASONS[data.reason] || data.reason}. Nothing changed; pick again.)`));
+    if (data.fallback) story.append(el("p", "note", `(${REASONS[data.reason] || data.reason}. Nothing changed; pick again.)` + (data.detail ? ` [${data.detail}]` : "")));
     applyState(data.state);
     scrollDown();
     return true;

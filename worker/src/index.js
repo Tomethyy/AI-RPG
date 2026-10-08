@@ -117,7 +117,7 @@ async function handleTurn(request, env) {
     await storeSave(env, save);
     const f = fallbackTurn(save, reason);
     console.log(JSON.stringify({ event: "fallback", reason, detail, turn: save.turn }));
-    return json({ fallback: true, reason, turn: { n: save.turn, action: action.text, dice: null, narration: f.narration }, state: await stateWithSpend(env, save) });
+    return json({ fallback: true, reason, detail: detail ? String(detail).slice(0, 300) : undefined, turn: { n: save.turn, action: action.text, dice: null, narration: f.narration }, state: await stateWithSpend(env, save) });
   };
 
   if (!env.ANTHROPIC_API_KEY) return fallback("no_api_key");
