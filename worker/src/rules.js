@@ -159,7 +159,7 @@ export function rollOption(save, option) {
   for (const { t, e } of talentEffects(a, "bonus")) {
     if ((!e.stat || e.stat === option.stat) && (!e.kind || e.kind === option.kind)) { mod += e.amount; parts.push(`+${e.amount} ${TALENTS[t.id].name}`); }
   }
-  if (a.conditions.includes(WOUNDED) && !hasTalent(a, "grim-resolve")) { mod -= 1; parts.push("-1 wounded"); }
+  if (a.conditions.includes(WOUNDED)) { mod -= 1; parts.push("-1 wounded"); }
 
   let adv = option.edge === "advantage", dis = option.edge === "disadvantage";
   if (adv) parts.push(`advantage: ${option.edge_why || "the situation helps"}`);
@@ -193,12 +193,15 @@ export function awardQuestXp(save, actor, kind, events) {
   gainXp(save, actor, kind === "milestone" ? XP.milestone : XP.side_quest, events);
 }
 
+// Three talents from those not owned, seeded per game: one from the character's best stat when there is one, two from the rest.
 function offerTalents(save, actor, label) {
   const owned = new Set((actor.talents || []).map((t) => t.id));
-  const pool = Object.keys(TALENTS).filter((id) => !owned.has(id));
   const r = rng(`${save.id}:offer:${label}`);
-  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-  return pool.slice(0, 3);
+  const shuffle = (list) => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+  const pool = shuffle(Object.keys(TALENTS).filter((id) => !owned.has(id)));
+  const top = [...STATS].sort((x, y) => actor.stats[y] - actor.stats[x])[0];
+  const favored = pool.find((id) => TALENTS[id].stat === top);
+  return [...(favored ? [favored] : []), ...pool.filter((id) => id !== favored)].slice(0, 3);
 }
 
 // Levels alternate: even levels give +1 to a stat of your choice, odd levels from 3 give a talent (1 of 3). Picks wait in a queue.

@@ -10,9 +10,43 @@ function section(title) { return el("h3", "", title); }
 
 // ---- Character screen ----
 
+let panelRender = () => {}; // what charAct redraws after an action
+
 function openCharacter() {
   showPanel(true);
+  panelRender = renderCharacter;
   renderCharacter();
+}
+
+// Active talents live here, one tap from the story (the bottom row's Talents button); the Character screen only shows them.
+function openTalents() {
+  panelRender = renderTalents;
+  showPanel(true);
+  renderTalents();
+}
+
+function renderTalents(notes = []) {
+  const body = $("ledgerBody");
+  body.replaceChildren();
+  const p = game?.pc;
+  if (!p) { body.append(el("p", "note", "Connect to the server to use talents.")); return; }
+  for (const n of notes) body.append(el("p", "note", n));
+  if (p.edge_next) body.append(el("p", "note", `Armed: your next ${p.edge_next.kind ? p.edge_next.kind + " " : ""}check has advantage. Social, Explore, Direct and Cautious are shown on each option.`));
+  const active = p.talents.filter((t) => t.use === "active");
+  body.append(section("Ready to use"));
+  for (const t of active) {
+    const card = el("div", "ledger-entity");
+    card.append(el("div", "ledger-name", t.name), el("div", "ledger-fact", t.text));
+    const btn = el("button", "mini", t.ready_in ? `Ready in ${t.ready_in} turns` : "Use");
+    btn.type = "button";
+    btn.disabled = busy || t.ready_in > 0;
+    btn.addEventListener("click", () => charAct({ act: "use", id: t.id }));
+    card.append(btn);
+    body.append(card);
+  }
+  if (!active.length) body.append(el("p", "note", "You have no active talents. Passive talents work on their own (see Character)."));
+  const passive = p.talents.filter((t) => t.use !== "active");
+  if (passive.length) body.append(section("Always on"), ...passive.map((t) => ledgerLine(t.name, t.text)));
 }
 
 function renderCharacter(notes = []) {
@@ -57,13 +91,7 @@ function renderCharacter(notes = []) {
   for (const t of p.talents) {
     const card = el("div", "ledger-entity");
     card.append(el("div", "ledger-name", t.name), el("div", "ledger-fact", t.text));
-    if (t.use === "active") {
-      const btn = el("button", "mini", t.ready_in ? `Ready in ${t.ready_in} turns` : "Use");
-      btn.type = "button";
-      btn.disabled = busy || t.ready_in > 0;
-      btn.addEventListener("click", () => charAct({ act: "use", id: t.id }));
-      card.append(btn);
-    }
+    if (t.use === "active") card.append(el("div", "ledger-meta", t.ready_in ? `Active · ready in ${t.ready_in} turns` : "Active · ready (use it from the Talents button)"));
     body.append(card);
   }
   if (!p.talents.length) body.append(el("p", "note", "No talents yet."));
@@ -131,13 +159,13 @@ async function charAct(body) {
       applyState(data.state);
       for (const e of data.events || []) story.append(el("p", "note", e));
       scrollDown();
-      renderCharacter(data.events || []);
+      panelRender(data.events || []);
     } else {
       if (data?.state) applyState(data.state);
-      renderCharacter([CHAR_ERRORS[data?.error] || `Error ${status}`]);
+      panelRender([CHAR_ERRORS[data?.error] || `Error ${status}`]);
     }
   } catch {
-    renderCharacter(["Couldn't reach the server."]);
+    panelRender(["Couldn't reach the server."]);
   }
 }
 

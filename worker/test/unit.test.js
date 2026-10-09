@@ -5,6 +5,8 @@ import { applyNewFacts, findEntity, relevantEntities } from "../src/ledger.js";
 import { validateTurn, costUSD, buildPrompt, OUTPUT_SCHEMA, SCHEMA_TOKENS } from "../src/ai.js";
 import { mergeDue, mergeJob, adoptFactMerge, parseFacts, FACT_TARGET } from "../src/factmerge.js";
 import { FACT_CAP, FACT_HARD } from "../src/ledger.js";
+import { TALENTS } from "../src/content.js";
+import { gainXp, applyPick } from "../src/rules.js";
 
 const good = () => ({
   narration: ["You ask. She answers.", ""],
@@ -16,7 +18,7 @@ const good = () => ({
   ],
   classification: "allowed",
   state_changes: [{ actor: "pc", kind: "hp", amount: -2, text: "", reason: "cut" }, { actor: "ghost", kind: "hp", amount: 5, text: "", reason: "" }],
-  new_facts: [{ entity: "Maren", type: "npc", fact: "Sews seals", location: "", was: "" }, { entity: "", type: "npc", fact: "x", location: "", was: "" }],
+  new_facts: [{ entity: "Maren", type: "npc", kind: "identity", fact: "Sews seals", location: "", was: "" }, { entity: "", type: "npc", kind: "identity", fact: "x", location: "", was: "" }],
   quest_flags: ["met_maren"],
 });
 
@@ -87,11 +89,12 @@ test("cost and schema basics", () => {
   assert.equal(costUSD("claude-haiku-5-5", { output_tokens: 1e6 }), 0.5);
   assert.equal(OUTPUT_SCHEMA.additionalProperties, false);
   assert.ok(SCHEMA_TOKENS > 100);
-  assert.equal(SCHEMA_VERSION, 4);
+  assert.equal(SCHEMA_VERSION, 5);
   assert.equal(migrate(newGame()).v, SCHEMA_VERSION);
   assert.throws(() => migrate({ v: SCHEMA_VERSION + 1 }));
   const pub = publicState(newGame());
-  assert.equal(typeof pub.scene.options[0], "string"); // no stats or difficulty leak to the phone
+  assert.deepEqual(Object.keys(pub.scene.options[0]), ["text", "tag"]); // the kind and stat as a tag; no difficulty or edge leaks to the phone
+  assert.equal(pub.scene.options[0].tag, "Social · Charm");
 });
 
 test("ledger facts: a hard cap, a cheap merge when an entity passes the cap, new facts survive the merge", async () => {
@@ -120,4 +123,62 @@ test("ledger facts: a hard cap, a cheap merge when an entity passes the cap, new
   assert.equal(tam.facts.length, FACT_HARD);
   assert.equal(tam.facts[0].text, "Tam fact 0"); // the identity fact stays
   assert.deepEqual(parseFacts("- One fact here\n2. Another fact\n\n  ok\n• Third fact\nFourth fact\nFifth fact\nSixth fact").length, FACT_TARGET);
+});
+
+test("facts are lasting truths: no event kind, two a turn, a status replaces the last, partial names merge", () => {
+  const f = (entity, kind, fact, extra = {}) => ({ entity, type: "npc", kind, fact, location: "", was: "", ...extra });
+  const s = newGame();
+  // an invalid kind (an event) is dropped; the person is still recorded; two facts an entity a turn
+  const raw = { ...good(), new_facts: [f("Reeve", "event", "Drew his belt knife"), f("Tam Reeve", "identity", "A rider"), f("Tam Reeve", "want", "Wants the ledger"), f("Tam Reeve", "secret", "Works for Hale")] };
+  const { turn } = validateTurn(raw, s);
+  assert.deepEqual(turn.new_facts.map((x) => [x.entity, x.fact]), [["Reeve", ""], ["Tam Reeve", "A rider"], ["Tam Reeve", "Wants the ledger"], ["Tam Reeve", ""]]);
+  // "Reeve" and "Tam Reeve" are one person; the longer name wins and the short one stays an alias
+  applyNewFacts(s, turn.new_facts, 3);
+  const reeves = Object.values(s.ledger.entities).filter((e) => /reeve/i.test(e.name));
+  assert.equal(reeves.length, 1);
+  assert.equal(reeves[0].name, "Tam Reeve");
+  assert.ok(reeves[0].aliases.includes("Reeve"));
+  assert.equal(reeves[0].facts.length, 2);
+  // two records that already exist (an older save) fold together when either is mentioned again
+  const old = newGame();
+  applyNewFacts(old, [f("Dobbin", "identity", "Toll-keeper")], 1);
+  old.ledger.entities["npc-dobbin-extra"] = { ...old.ledger.entities["npc-dobbin"], id: "npc-dobbin-extra", name: "Hob Dobbin", facts: [{ text: "Keeps a ledger", turn: 2 }], first_turn: 2 };
+  applyNewFacts(old, [f("Dobbin", "want", "Wants his debt paid")], 5);
+  assert.equal(Object.values(old.ledger.entities).filter((e) => /dobbin/i.test(e.name)).length, 1);
+  // numbered people stay separate; two people who share one name word are never guessed
+  const crowd = newGame();
+  for (const n of ["Drover 1", "Drover 2", "Tam Reeve", "Tam Dobbin"]) applyNewFacts(crowd, [f(n, "identity", `${n} is here`)], 1);
+  applyNewFacts(crowd, [f("Tam", "identity", "Just Tam")], 2);
+  assert.equal(Object.values(crowd.ledger.entities).filter((e) => e.type === "npc").length, 5);
+  // a status replaces the previous status
+  const st = newGame();
+  applyNewFacts(st, [f("Maren", "identity", "A seal-sewer"), f("Maren", "status", "Hostile to Ash")], 2);
+  applyNewFacts(st, [f("Maren", "status", "Allied with Ash")], 4);
+  assert.deepEqual(findEntity(st, "Maren").facts.map((x) => x.text), ["A seal-sewer", "Allied with Ash"]);
+});
+
+test("talent offers include one from the character's best stat, seeded per game", () => {
+  const s = newGame("main", undefined, { name: "Hana", background: "clerk", drive: "debt", flaw: "proud", law: "neutral", good: "neutral", free: { wits: 1, charm: 1 }, talent: "quick-study" });
+  const p = s.actors.pc;
+  for (let i = 0; i < 6; i++) {
+    s.id = `game-${i}`;
+    p.picks = [];
+    gainXp(s, p, 1000 - p.xp > 0 ? 1000 : 1, []); // jump to a high level; the odd levels each queue an offer
+    const offers = p.picks.filter((x) => x.kind === "talent");
+    assert.ok(offers.length >= 1);
+    assert.ok(offers[0].offer.length === 3 && new Set(offers[0].offer).size === 3);
+    assert.ok(offers[0].offer.some((id) => TALENTS[id].stat === "wits"), `${offers[0].offer}`); // clerk: wits 4 is the best stat
+    p.level = 1; p.xp = 0;
+  }
+});
+
+test("v4 saves migrate to v5", () => {
+  const s = newGame();
+  s.v = 4;
+  s.actors.pc.talents = [{ id: "grim-resolve", ready_turn: 0 }];
+  s.actors.pc.picks = [{ kind: "talent", level: 3, offer: ["grim-resolve", "keen-eye", "stubborn"] }];
+  migrate(s);
+  assert.equal(s.v, 5);
+  assert.equal(s.actors.pc.talents[0].id, "stubborn");
+  assert.deepEqual(s.actors.pc.picks[0].offer, ["stubborn", "keen-eye"]);
 });

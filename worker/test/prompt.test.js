@@ -186,7 +186,7 @@ test("v2 saves migrate forward", () => {
   s.summary = { text: "", through_turn: 0 };
   s.counters = { ai_turns: 3, fallbacks: 0, retries: 0, dc: {}, dc_clamped: 0 };
   migrate(s);
-  assert.equal(s.v, 4);
+  assert.equal(s.v, 5);
   assert.equal(s.summary.requested_through, 0);
   assert.equal(s.counters.ai_turns, 3);
   assert.deepEqual(s.counters.kinds, {});

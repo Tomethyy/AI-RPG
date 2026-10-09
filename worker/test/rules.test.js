@@ -105,8 +105,10 @@ test("roll modifier: stat, matching gear, talent bonus, wounded", () => {
   assert.equal(rollOption(s, opt("might")).mod, 3); // 2 + cudgel
   p.conditions.push("Wounded");
   assert.equal(rollOption(s, opt("grit")).mod, 3); // 3 + coat - 1
-  addTalent(p, "grim-resolve");
-  assert.equal(rollOption(s, opt("grit")).mod, 4);
+  addTalent(p, "stubborn");
+  assert.equal(rollOption(s, opt("grit")).mod, 3 + 1 - 1 + 1 - 0); // 3 + coat + stubborn - wounded
+  assert.match(rollOption(s, opt("grit")).note, /\+1 Stubborn/);
+  p.conditions = [];
   addTalent(p, "silver-tongue");
   assert.equal(rollOption(s, opt("charm", "standard")).mod, 2); // charm 1 + silver tongue on a social option
   assert.equal(rollOption(s, opt("charm", "standard", { kind: "direct" })).mod, 1);
@@ -318,7 +320,7 @@ test("v3 saves migrate to v4: new stat, talent picks, tiers, hp formula", () => 
   assert.equal(old.v, 3);
   const s = migrate(structuredClone(old));
   const p = s.actors.pc;
-  assert.equal(s.v, 4);
+  assert.equal(s.v, 5);
   assert.equal(p.stats.charm, 0);
   assert.equal(p.stats.wits, 3);
   assert.equal(p.level, 3);
@@ -334,7 +336,7 @@ test("v3 saves migrate to v4: new stat, talent picks, tiers, hp formula", () => 
   assert.deepEqual(s.failed, []);
   assert.equal(s.ledger.entities["location-the-rusted-ford"].facts.length, 2);
   assert.equal(s.counters.dc[11], 2);
-  assert.equal(migrate(structuredClone(s)).v, 4); // migrating again changes nothing
+  assert.equal(migrate(structuredClone(s)).v, 5); // migrating again changes nothing
   assert.equal(publicState(s).pc.pick.kind, "talent");
 });
 
@@ -345,7 +347,7 @@ test("v1 saves migrate to the rules engine", () => {
   s.actors.pc.equipment = { weapon: { id: "item-worn-shortsword", name: "Worn shortsword" } };
   delete s.ledger.entities["location-the-rusted-ford"].danger;
   migrate(s);
-  assert.equal(s.v, 4);
+  assert.equal(s.v, 5);
   assert.equal(s.actors.pc.equipment.weapon.damage, 3);
   assert.equal(s.ledger.entities["location-the-rusted-ford"].danger, 0);
   assert.deepEqual(s.counters.dc, {});

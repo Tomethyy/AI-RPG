@@ -26,12 +26,12 @@ Prompt (Phase 4) lives in `worker/src/prompt.js`: a token budget per section kee
 however long the campaign runs. Rules, the world core and the tone are a cached system prefix; summary and quest are a second cached block.
 Turns since the summary go in verbatim (newest 5) or in brief. `worker/src/summary.js` folds old turns into a rolling summary
 of at most 250 words, with Haiku in the background every 5 turns (own KV key `sum:<game id>`, adopted on the next request).
-`worker/src/factmerge.js` does the same for an entity that holds more than 8 facts (key `fm:<game id>`).
+`worker/src/factmerge.js` does the same for an entity that holds more than 8 facts (key `fm:<game id>`). Facts must carry a lasting kind (no events); New game makes one AI call to write the character's intro (`writeIntro` in `index.js`).
 Duplicate entities merge through the `was` field of new_facts. More → Prompt shows the next prompt section by section with
 token estimates (including the output schema, scaled by the last turn's real/estimated ratio), the last turn's real usage and cost, and counters (`GET /api/prompt`).
 Optional variable `SUMMARY_MODEL` (default claude-haiku-5-5), used for summaries and fact merges.
 
-Saves: schema v4. An older save is copied to `bak:main:v<old version>` in KV before it is migrated, once. Starting a new game keeps the previous save in `bak:main`.
+Saves: schema v5. An older save is copied to `bak:main:v<old version>` in KV before it is migrated, once. Starting a new game keeps the previous save in `bak:main`.
 
 Before each deploy run `python3 stamp.py` (stamps build number and time into index.html, every script, style.css and the manifest link; shown in the More sheet).
 

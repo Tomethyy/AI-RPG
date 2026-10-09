@@ -24,19 +24,21 @@
 //           equipment{slot: item}, inventory[{id,name,qty,note,gear?}], conditions[],
 //           bio {background, drive, flaw} | null, align {law, good} (hidden numbers, -12..12), talents[{id, ready_turn}],
 //           picks[{kind: "stat"|"talent", level, offer?}] (level-up choices waiting), edge_next {kind, from} | null }
-// Entity: { id, type, name, aliases[] (earlier names, kept on rename or merge), location_id, connections[], facts[{text,turn}], first_turn, last_turn, danger (locations only, 0-2, set by code) }
+// Entity: { id, type, name, aliases[] (earlier names, kept on rename or merge), location_id, connections[], facts[{text,turn,kind}], first_turn, last_turn, danger (locations only, 0-2, set by code) }
 // Gear:   { id, name, slot: "weapon"|"armor", rarity, bonus_stat, big?, damage+mult (weapons) | defense (armor) }. Inventory gear carries it in `gear`.
 // Option: { text, kind, stat, tier: "easy"|"standard"|"hard"|"daunting", edge: "none"|"advantage"|"disadvantage", edge_why }
 // Milestone: { id, title, conditions[], status: "undiscovered"|"ongoing"|"completed", next[] }
 // Every turn also goes to an archive in chunks: "arc:<game id>:<n>" = [TurnRecord] (ARCHIVE_CHUNK per key).
 
 import { ensureGearStats, rollDanger, xpForLevel, MAX_LEVEL, maxHpOf, packUsed, packSlots, alignLabel, catchUpPicks } from "./rules.js";
-import { BACKGROUNDS, DRIVES, FLAWS, TALENTS, tierFromNumber } from "./content.js";
+import { BACKGROUNDS, DRIVES, FLAWS, TALENTS, STAT_LABELS, KIND_LABELS, tierFromNumber } from "./content.js";
 import { buildActor, DEFAULT_CHARACTER, validateCharacter } from "./character.js";
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 export const STATS = ["might", "wits", "charm", "grit"];
 export const ENTITY_TYPES = ["npc", "location", "faction", "item", "quest", "lore"];
+// A stored fact must be one of these lasting kinds; there is deliberately no "event" kind (what someone did in one scene).
+export const FACT_KINDS = ["identity", "want", "relationship", "secret", "status", "place"];
 export const OPTION_KINDS = ["social", "explore", "direct", "cautious", "other"];
 export const OPTION_TIERS = ["easy", "standard", "hard", "daunting"];
 export const OPTION_EDGES = ["none", "advantage", "disadvantage"];
@@ -177,6 +179,14 @@ export function migrate(save) {
     save.fm ??= null;
     Object.assign(save.counters, { tiers: {}, results: {}, edges: 0, fact_merges: 0, ...save.counters });
   }
+  if (save.v < 5) {
+    // v5: Grim Resolve became Stubborn; facts may carry a kind.
+    for (const a of Object.values(save.actors)) {
+      for (const t of a.talents || []) if (t.id === "grim-resolve") t.id = "stubborn";
+      for (const p of a.picks || []) if (p.offer) p.offer = [...new Set(p.offer.map((id) => (id === "grim-resolve" ? "stubborn" : id)))];
+    }
+    save.fm ??= null;
+  }
   save.v = SCHEMA_VERSION;
   return save;
 }
@@ -197,7 +207,7 @@ function publicPick(a) {
   return { kind: "talent", level: p.level, offer: p.offer.map((id) => ({ id, name: TALENTS[id].name, text: TALENTS[id].text })) };
 }
 
-// What the phone gets: no internal option stats or difficulties (option text stays neutral).
+// What the phone gets: each option with its kind and stat as a small tag, but never its difficulty or edge (option text stays neutral).
 export function publicState(save, extra = {}) {
   const p = pc(save);
   const bio = p.bio && { background: BACKGROUNDS[p.bio.background]?.name || "", drive: DRIVES[p.bio.drive]?.text || "", flaw: FLAWS[p.bio.flaw]?.name || "", flaw_text: FLAWS[p.bio.flaw]?.text || "" };
@@ -215,7 +225,7 @@ export function publicState(save, extra = {}) {
       edge_next: p.edge_next ? { kind: p.edge_next.kind } : null,
       pick: publicPick(p), picks_left: p.picks?.length || 0,
     },
-    scene: { narration: save.scene.narration, options: save.scene.options.map((o) => o.text) },
+    scene: { narration: save.scene.narration, options: save.scene.options.map((o) => ({ text: o.text, tag: [KIND_LABELS[o.kind], STAT_LABELS[o.stat]].filter(Boolean).join(" · ") })) },
     recent: save.recent.slice(-RECENT_PROMPT).map((t) => ({ n: t.n, action: t.action.text, dice: t.dice, narration: t.narration })),
     ...extra,
   };

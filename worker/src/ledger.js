@@ -20,6 +20,18 @@ export function findEntity(save, name, type) {
   return loose;
 }
 
+// People are often named in pieces: "Reeve", then "Tam Reeve". One name's words all appear in the other's, and only one person fits.
+function partialMatches(save, name, type) {
+  const words = (n) => norm(n).split(" ").filter((w) => w.length > 2 || /\d/.test(w));
+  const mine = words(name);
+  if (!mine.length) return [];
+  const subset = (a, b) => a.every((w) => b.includes(w));
+  return Object.values(save.ledger.entities).filter((e) => {
+    if (e.type !== type) return false;
+    return [e.name, ...e.aliases].some((n) => { const theirs = words(n); return theirs.length && (subset(mine, theirs) || subset(theirs, mine)); });
+  });
+}
+
 function createEntity(save, type, name, turn) {
   const base = `${type}-${slugify(name)}`;
   let id = base;
@@ -74,6 +86,17 @@ function rename(e, name) {
 // The entity a fact is about, honoring `was` (an earlier name or description of the same thing).
 function resolveEntity(save, f, type, turn) {
   let e = findEntity(save, f.entity, type);
+  if (type === "npc") {
+    // Fold a partial name into the one person it fits, and two records of one person into one.
+    const part = partialMatches(save, f.entity, type);
+    if (!e && part.length === 1) e = part[0];
+    if (e && part.length === 2 && part.includes(e)) {
+      const other = part.find((x) => x !== e);
+      const [keep, drop] = e.first_turn <= other.first_turn ? [e, other] : [other, e];
+      e = mergeEntities(save, keep, drop);
+    }
+    if (e && norm(f.entity).split(" ").length > norm(e.name).split(" ").length && partialMatches(save, f.entity, type).includes(e)) rename(e, f.entity); // "Tam Reeve" beats "Reeve"
+  }
   const was = f.was && norm(f.was) !== norm(f.entity) ? f.was : "";
   const prev = was ? findEntity(save, was, type) : null;
   if (prev && prev.type === type) {
@@ -108,7 +131,9 @@ export function applyNewFacts(save, facts, turn) {
     }
     const text = String(f.fact || "").trim().slice(0, 300);
     if (text && !e.facts.some((x) => norm(x.text) === norm(text))) {
-      e.facts.push({ text, turn });
+      // A status (dead, hostile, allied...) replaces the previous status instead of piling up.
+      if (f.kind === "status") e.facts = e.facts.filter((x) => x.kind !== "status");
+      e.facts.push(f.kind ? { text, turn, kind: f.kind } : { text, turn });
       added++;
     }
     if (e.facts.length > FACT_HARD) e.facts = [e.facts[0], ...e.facts.slice(-(FACT_HARD - 1))];

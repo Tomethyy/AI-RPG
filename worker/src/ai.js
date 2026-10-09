@@ -1,6 +1,6 @@
 // One AI turn: prompt assembly, structured JSON output, validation with retry, safe fallback.
 import Anthropic from "@anthropic-ai/sdk";
-import { STATS, ENTITY_TYPES, OPTION_KINDS, OPTION_TIERS, OPTION_EDGES, CLASSIFICATIONS, CHANGE_KINDS } from "./schema.js";
+import { STATS, ENTITY_TYPES, FACT_KINDS, OPTION_KINDS, OPTION_TIERS, OPTION_EDGES, CLASSIFICATIONS, CHANGE_KINDS } from "./schema.js";
 import { tierFromNumber } from "./content.js";
 import { activeFailures } from "./rules.js";
 import { norm } from "./ledger.js";
@@ -57,8 +57,8 @@ export const OUTPUT_SCHEMA = {
       type: "array",
       items: {
         type: "object", additionalProperties: false,
-        required: ["entity", "type", "fact", "location", "was"],
-        properties: { entity: str, type: { type: "string", enum: ENTITY_TYPES }, fact: str, location: str, was: str },
+        required: ["entity", "type", "kind", "fact", "location", "was"],
+        properties: { entity: str, type: { type: "string", enum: ENTITY_TYPES }, kind: { type: "string", enum: FACT_KINDS }, fact: str, location: str, was: str },
       },
     },
     quest_flags: { type: "array", items: str },
@@ -105,10 +105,20 @@ export function validateTurn(raw, save) {
     .filter((c) => c && CHANGE_KINDS.includes(c.kind) && save.actors[c.actor || "pc"])
     .slice(0, 10)
     .map((c) => ({ actor: c.actor || "pc", kind: c.kind, amount: Math.round(Number(c.amount) || 0), text: String(c.text || "").slice(0, 80), reason: String(c.reason || "").slice(0, 120) }));
+  // A fact needs a lasting kind (no events) and an entity gets at most two facts a turn; an entity named without a valid fact is still recorded.
+  const perEntity = new Map();
   const new_facts = (Array.isArray(raw.new_facts) ? raw.new_facts : [])
-    .filter((f) => f && String(f.entity || "").trim() && String(f.fact || "").trim())
+    .filter((f) => f && String(f.entity || "").trim())
     .slice(0, 15)
-    .map((f) => ({ entity: String(f.entity).trim().slice(0, 80), type: ENTITY_TYPES.includes(f.type) ? f.type : "lore", fact: String(f.fact).trim(), location: String(f.location || "").trim().slice(0, 80), was: String(f.was || "").trim().slice(0, 80) }));
+    .map((f) => {
+      const entity = String(f.entity).trim().slice(0, 80);
+      const key = norm(entity);
+      const used = perEntity.get(key) || 0;
+      const kind = FACT_KINDS.includes(f.kind) ? f.kind : "";
+      const keep = kind && used < 2 && String(f.fact || "").trim();
+      if (keep) perEntity.set(key, used + 1);
+      return { entity, type: ENTITY_TYPES.includes(f.type) ? f.type : "lore", kind, fact: keep ? String(f.fact).trim() : "", location: String(f.location || "").trim().slice(0, 80), was: String(f.was || "").trim().slice(0, 80) };
+    });
   const quest_flags = (Array.isArray(raw.quest_flags) ? raw.quest_flags : []).map((s) => String(s).slice(0, 60)).filter(Boolean).slice(0, 8);
 
   return { turn: errors.length ? null : { narration, options: options.slice(0, 4), classification, state_changes, new_facts, quest_flags }, errors };

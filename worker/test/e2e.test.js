@@ -79,7 +79,12 @@ test("a 30-turn game: creation, turns, level-ups, talents, fact merge, summaries
   assert.equal(state.pc.align, "Neutral Good");
   assert.deepEqual(Object.keys(state.pc.stats), ["might", "wits", "charm", "grit"]);
   assert.equal(state.pc.talents[0].name, "Light Fingers");
-  assert.equal(state.scene.options.length, 4);
+  assert.ok(state.scene.options.length >= 3);
+  // the intro: one AI call wrote the opening scene instead of the fixed one
+  assert.match(state.scene.narration[0], /^Mock narration/);
+  const introCall = JSON.parse(fs.readFileSync(logFile, "utf8").trim().split("\n").at(-1));
+  assert.match(introCall.body.messages[0].content[1].text, /\(new game\) Write the opening scene/);
+  assert.match(introCall.body.messages[0].content[1].text, /Drive: Someone you love is missing/);
 
   const kinds = {};
   const results = { success: 0, cost: 0, failure: 0 };
@@ -114,7 +119,7 @@ test("a 30-turn game: creation, turns, level-ups, talents, fact merge, summaries
       assert.equal(again.data.turn.n, t.n);
     }
     state = r.data.state;
-    for (const o of state.scene.options) assert.equal(typeof o, "string");
+    for (const o of state.scene.options) assert.deepEqual(Object.keys(o), ["text", "tag"]);
     await settle(); // background summary / fact merge, as ctx.waitUntil would run them
 
     // Character screen actions between turns: picks, a talent, a drop
@@ -150,8 +155,10 @@ test("a 30-turn game: creation, turns, level-ups, talents, fact merge, summaries
 
   // the save: prompt stayed flat, background jobs ran, the ledger stayed tidy, counters are consistent
   const save = JSON.parse(kv.raw("save:main"));
-  assert.equal(save.v, 4);
+  assert.equal(save.v, 5);
   assert.equal(save.counters.ai_turns, 30);
+  assert.ok(save.intro, "the intro call is recorded");
+  assert.ok(save.summary.text.length > 0);
   assert.ok(save.counters.summaries >= 3, `summaries ${save.counters.summaries}`);
   assert.ok(save.counters.fact_merges >= 1, "an entity passed the fact cap and was merged");
   const maren = Object.values(save.ledger.entities).find((e) => e.name === "Maren");
@@ -221,7 +228,7 @@ test("an old v3 save is copied, then migrated, once", async () => {
   kv.writes = 0;
   const state = (await call(env, "GET", "/api/state")).data;
   assert.equal(kv.raw("bak:main:v3"), raw, "the old save is kept byte for byte");
-  assert.equal(JSON.parse(kv.raw("save:main")).v, 4);
+  assert.equal(JSON.parse(kv.raw("save:main")).v, 5);
   assert.equal(kv.writes, 2);
   assert.equal(state.pc.level, 3);
   assert.equal(state.pc.pick.kind, "talent"); // a starting talent to choose
@@ -239,4 +246,26 @@ test("an old v3 save is copied, then migrated, once", async () => {
   await kv.put("save:main", future);
   assert.equal((await call(env, "GET", "/api/state")).status, 500);
   assert.equal(kv.raw("save:main"), future);
+});
+
+test("without an API key a new game keeps the fixed opening scene", async () => {
+  const env = makeEnv(makeKV(), { ANTHROPIC_API_KEY: "" });
+  const r = await call(env, "POST", "/api/new", { confirm: true, character: CHARACTER });
+  assert.equal(r.status, 200);
+  assert.match(r.data.scene.narration[0], /^Rain hammers the old toll house/);
+});
+
+test("a v4 save (with Grim Resolve) upgrades to v5", async () => {
+  const kv = makeKV();
+  const env = makeEnv(kv);
+  const made = (await call(env, "POST", "/api/new", { confirm: true, character: { ...CHARACTER, background: "drover", talent: "stubborn" } })).data;
+  assert.equal(made.pc.talents[0].name, "Stubborn");
+  const save = JSON.parse(kv.raw("save:main"));
+  save.v = 4;
+  save.actors.pc.talents[0].id = "grim-resolve";
+  const raw = JSON.stringify(save);
+  await kv.put("save:main", raw);
+  const state = (await call(env, "GET", "/api/state")).data;
+  assert.equal(kv.raw("bak:main:v4"), raw);
+  assert.equal(state.pc.talents[0].name, "Stubborn");
 });

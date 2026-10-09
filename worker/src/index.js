@@ -2,7 +2,7 @@
 import { newGame, migrate, publicState, ledgerView, SCHEMA_VERSION, RECENT_PROMPT, RECENT_KEEP, SUMMARY_BATCH, ARCHIVE_CHUNK } from "./schema.js";
 import { applyNewFacts, ensureLocation } from "./ledger.js";
 import { runTurn, fallbackTurn, varyOptions, DEFAULT_TURN_MODEL, DEFAULT_SUMMARY_MODEL, SCHEMA_TEXT, SCHEMA_TOKENS } from "./ai.js";
-import { buildPrompt, BUDGET } from "./prompt.js";
+import { buildPrompt, BUDGET, INTRO_ACTION, fit } from "./prompt.js";
 import { adoptSummary, summaryDue, summaryJob, updateSummary } from "./summary.js";
 import { adoptFactMerge, mergeDue, mergeJob, runFactMerge } from "./factmerge.js";
 import { rollOption, applyChanges, logDifficulty, consumeEdge, recordFailure, clearFailures, applyPick, useTalent, dropItem } from "./rules.js";
@@ -201,6 +201,21 @@ async function handleTurn(request, env, ctx) {
   return json(response);
 }
 
+// One AI call opens a new game: who the character is and why they are at the ford, from their background, drive and flaw.
+// If it cannot run (no key, daily cap, a failed reply) the fixed opening scene stays.
+async function writeIntro(env, save) {
+  if (!env.ANTHROPIC_API_KEY || (await getSpend(env)) >= capUSD(env)) return;
+  const r = await runTurn(env, save, INTRO_ACTION, null);
+  await addSpend(env, r.cost);
+  console.log(JSON.stringify({ event: "intro", ok: !!r.turn, usage: r.usage, cost: r.cost, error: r.error }));
+  if (!r.turn) return;
+  const t = r.turn;
+  save.scene = { location_id: save.scene.location_id, narration: t.narration, options: t.options };
+  applyNewFacts(save, t.new_facts, 1);
+  save.summary.text = fit(t.narration.join(" "), BUDGET.summary);
+  save.intro = { cost: r.cost };
+}
+
 // Character screen actions (no AI call): pick a level-up reward, use a talent, drop an item.
 async function handleChar(request, env) {
   const { body, error } = await readBody(request);
@@ -283,6 +298,7 @@ async function route(request, env, ctx) {
     const old = await env.GAME.get(`save:${SLOT}`);
     if (old) await env.GAME.put(`bak:${SLOT}`, old); // one step back, in case of a mis-tap
     const save = newGame(SLOT, undefined, picked.character);
+    await writeIntro(env, save);
     await storeSave(env, save);
     return json(await stateWithSpend(env, save));
   }

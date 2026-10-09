@@ -49,10 +49,10 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.35"; // stamped by stamp.py
+const JS_BUILD = "1.37"; // stamped by stamp.py
 const HP_MAX = 20;
-const GENERIC = ["Look", "Talk", "Travel", "Rest"];
-const MORE = ["Character", "Ledger", "Prompt", "Wildcard", "Custom action"];
+const GENERIC = ["Talents", "Travel", "Rest", "Custom"];
+const MORE = ["Character", "Ledger", "Prompt", "Wildcard"];
 const PANELS = new Set(["Character", "Ledger", "Prompt"]); // open inside the More sheet
 let turnIndex = 0;
 
@@ -88,10 +88,11 @@ function setBusy(on) {
 function applyState(state) {
   game = state;
   renderHeader(state.location, state.pc.hp, state.pc.hp_max, state.turn);
-  renderOptions(state.scene.options, (i) => act({ kind: "option", index: i }, state.scene.options[i]));
+  renderOptions(state.scene.options, (i) => act({ kind: "option", index: i }, state.scene.options[i].text));
   // A waiting level-up choice lights up the More button and the Character entry.
   const waiting = !!state.pc.pick;
   generic.lastElementChild?.classList.toggle("alert", waiting);
+  generic.firstElementChild.textContent = state.pc.edge_next ? "Talents ⚡" : "Talents"; // an advantage talent is armed
   document.querySelector("#sheetBody button")?.classList.toggle("alert", waiting);
 }
 
@@ -207,9 +208,8 @@ function useGeneric(label) {
   if (label === "Character") { openCharacter(); return; }
   if (label === "Ledger") { openLedger(); return; }
   if (label === "Prompt") { openPrompt(); return; }
-  if (label === "Custom action") { openCustom(); return; }
-  if (online() && label === "Look") { act({ kind: "look" }, "Look around"); return; }
-  if (online() && label === "Talk") { act({ kind: "talk" }, "Talk to someone nearby"); return; }
+  if (label === "Talents") { openTalents(); return; }
+  if (label === "Custom") { openCustom(); return; }
   addNote(`[${label}] is not wired up yet.`);
 }
 
@@ -217,7 +217,7 @@ function buildGeneric() {
   for (const label of GENERIC) {
     const btn = el("button", "", label);
     btn.type = "button";
-    btn.addEventListener("click", () => useGeneric(label));
+    btn.addEventListener("click", () => { if (label === "Talents") setSheet(true); useGeneric(label); });
     generic.append(btn);
   }
   const more = el("button", "", "More");

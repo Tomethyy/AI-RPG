@@ -13,9 +13,12 @@ export const STAT_HELP = {
 export const TIERS = { easy: 7, standard: 10, hard: 13, daunting: 16 };
 export const tierFromNumber = (n) => (n <= 8 ? "easy" : n <= 11 ? "standard" : n <= 14 ? "hard" : "daunting");
 
+// What the phone shows on each option (never the difficulty or an edge).
+export const KIND_LABELS = { social: "Social", explore: "Explore", direct: "Direct", cautious: "Cautious", other: "" };
+
 export const TALENT_COOLDOWN = 10; // turns before an active talent is ready again (Rest refreshes it from Phase 8)
 
-// effect.type: bonus (+amount on checks matching stat/kind), slots (+pack slots), maxhp, ignore_wounded (passive);
+// effect.type: bonus (+amount on checks matching stat and/or kind), slots (+pack slots), maxhp (passive);
 // heal (pct of max HP), cleanse (all conditions but Wounded), edge (advantage on the next check, optionally of one kind) (active).
 // Phase 6 maps each type to a combat effect.
 export const TALENTS = {
@@ -30,13 +33,13 @@ export const TALENTS = {
   "rousing-speech": { name: "Rousing Speech", stat: "charm", use: "active", effect: { type: "heal", pct: 25 }, text: "Steadying words recover a quarter of your max HP. Ready again after 10 turns." },
   "tough": { name: "Tough as Boots", stat: "grit", use: "passive", effect: { type: "maxhp", amount: 4 }, text: "+4 max HP." },
   "iron-will": { name: "Iron Will", stat: "grit", use: "active", effect: { type: "cleanse" }, text: "Shake off every condition except Wounded. Ready again after 10 turns." },
-  "grim-resolve": { name: "Grim Resolve", stat: "grit", use: "passive", effect: { type: "ignore_wounded" }, text: "Being Wounded no longer costs you -1." },
+  "stubborn": { name: "Stubborn", stat: "grit", use: "passive", effect: { type: "bonus", stat: "grit", amount: 1 }, text: "+1 on every Grit check: endure, resist, keep your nerve." },
 };
 
 // Each background sets the stat spread (+3/+2/+1/0), the starting kit and three talents to pick one from.
 export const BACKGROUNDS = {
   soldier: { name: "Soldier", text: "Served a lord's levy until it was disbanded.", stats: { might: 3, grit: 2, charm: 1, wits: 0 }, gear: ["Notched shortsword", "Gambeson"], items: [["Coins", 8], ["Trail rations", 2]], talents: ["second-wind", "heavy-hand", "iron-will"] },
-  drover: { name: "Drover", text: "Walked cattle and carts along the river roads.", stats: { grit: 3, might: 2, wits: 1, charm: 0 }, gear: ["Hickory cudgel", "Oiled travel coat"], items: [["Coins", 10], ["Trail rations", 3], ["Coil of rope", 1]], talents: ["pack-mule", "tough", "grim-resolve"] },
+  drover: { name: "Drover", text: "Walked cattle and carts along the river roads.", stats: { grit: 3, might: 2, wits: 1, charm: 0 }, gear: ["Hickory cudgel", "Oiled travel coat"], items: [["Coins", 10], ["Trail rations", 3], ["Coil of rope", 1]], talents: ["pack-mule", "tough", "stubborn"] },
   clerk: { name: "Clerk", text: "Kept ledgers for a guild house and learned who owes whom.", stats: { wits: 3, charm: 2, grit: 1, might: 0 }, gear: ["Letter dagger", "Travelling cloak"], items: [["Coins", 14], ["Trail rations", 2], ["Ink and quills", 1]], talents: ["quick-study", "keen-eye", "silver-tongue"] },
   hunter: { name: "Hunter", text: "Trapped and tracked in the Greywold's edge.", stats: { wits: 3, grit: 2, might: 1, charm: 0 }, gear: ["Hunting bow", "Hardened leathers"], items: [["Coins", 6], ["Trail rations", 3], ["Snare wire", 1]], talents: ["keen-eye", "light-fingers", "second-wind"] },
   pedlar: { name: "Pedlar", text: "Sold needles, rumors and trinkets from town to town.", stats: { charm: 3, wits: 2, grit: 1, might: 0 }, gear: ["Boot knife", "Patched pedlar's coat"], items: [["Coins", 20], ["Trail rations", 2], ["Tin trinkets", 1]], talents: ["silver-tongue", "commanding-presence", "light-fingers"] },

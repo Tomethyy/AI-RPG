@@ -76,11 +76,14 @@ function renderHeader(location, hp, hpMax, turnNo) {
   $("turn").textContent = "Turn " + turnNo;
 }
 
-function renderOptions(texts, onPick) {
+// Options are { text, tag } from the server (tag like "Social · Charm") or plain strings (offline demo).
+function renderOptions(items, onPick) {
   const options = $("options");
   options.replaceChildren();
-  texts.forEach((text, i) => {
+  items.forEach((item, i) => {
+    const text = typeof item === "string" ? item : item.text;
     const btn = el("button", "", text);
+    if (item.tag) btn.append(" ", el("span", "tag", item.tag));
     btn.type = "button";
     btn.addEventListener("click", () => onPick(i, text));
     options.append(btn);

@@ -27,9 +27,9 @@ function turnJSON() {
       ...(n % 4 === 1 ? [{ actor: "pc", kind: "item_add", amount: 1, text: `Trinket ${n}`, reason: "found" }] : []),
     ],
     new_facts: [
-      { entity: n === 1 ? "The woman by the hearth" : "Maren", type: "npc", fact: n === 1 ? "Sews a seal onto a satchel" : "Sews seals onto satchels", location: "The Rusted Ford", was: n === 2 ? "the woman by the hearth" : "" },
-      { entity: "Gull's Landing", type: "location", fact: "A ferry landing downriver", location: "The Rusted Ford", was: "" },
-      { entity: "Maren", type: "npc", fact: `Muttered about the road on turn ${n}`, location: "", was: "" },
+      { entity: n === 1 ? "The woman by the hearth" : "Maren", type: "npc", kind: "identity", fact: n === 1 ? "Sews a seal onto a satchel" : "Sews seals onto satchels", location: "The Rusted Ford", was: n === 2 ? "the woman by the hearth" : "" },
+      { entity: "Gull's Landing", type: "location", kind: "place", fact: "A ferry landing downriver", location: "The Rusted Ford", was: "" },
+      { entity: "Maren", type: "npc", kind: "want", fact: `Wants the road kept closed, reason ${n}`, location: "", was: "" },
     ],
     quest_flags: [],
   };
