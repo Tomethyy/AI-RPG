@@ -1,7 +1,9 @@
 // AI-RPG backend (Cloudflare Worker): shared-secret proxy to the Claude API, daily spend cap, server-side save.
-import { newGame, migrate, publicState, ledgerView, RECENT_TURNS, ARCHIVE_CHUNK } from "./schema.js";
+import { newGame, migrate, publicState, ledgerView, RECENT_PROMPT, RECENT_KEEP, SUMMARY_BATCH, ARCHIVE_CHUNK } from "./schema.js";
 import { applyNewFacts, ensureLocation } from "./ledger.js";
-import { runTurn, fallbackTurn } from "./ai.js";
+import { runTurn, fallbackTurn, varyOptions, DEFAULT_TURN_MODEL, DEFAULT_SUMMARY_MODEL } from "./ai.js";
+import { buildPrompt, BUDGET } from "./prompt.js";
+import { adoptSummary, summaryDue, summaryJob, updateSummary } from "./summary.js";
 import { rollOption, applyChanges, logDifficulty } from "./rules.js";
 
 const SERVER_VERSION = 1;
@@ -90,7 +92,7 @@ function resolveAction(save, a) {
   return null;
 }
 
-async function handleTurn(request, env) {
+async function handleTurn(request, env, ctx) {
   const { body, error } = await readBody(request);
   if (error) return json({ error }, error === "too_large" ? 413 : 400);
   const requestId = String(body.request_id || "").slice(0, 64);
@@ -100,6 +102,7 @@ async function handleTurn(request, env) {
   // Same request again (app closed mid-turn, network retry): hand back the stored result, no second AI call.
   if (save.last?.request_id === requestId) return json({ ...save.last.response, replay: true });
   if (body.turn !== save.turn) return json({ error: "stale", state: await stateWithSpend(env, save) }, 409);
+  await adoptSummary(env, save);
 
   const action = resolveAction(save, body.action);
   if (!action) return json({ error: "bad_action" }, 400);
@@ -124,6 +127,12 @@ async function handleTurn(request, env) {
 
   const t = result.turn;
   const n = save.turn + 1;
+  // Soft variety: repeats of recent options are dropped (3 always remain), a turn with too few kinds is only counted.
+  const varied = varyOptions(save, t.options);
+  t.options = varied.options;
+  save.counters.options_dropped += varied.dropped;
+  if (varied.low) save.counters.variety_low++;
+  for (const o of t.options) save.counters.kinds[o.kind] = (save.counters.kinds[o.kind] || 0) + 1;
   // Code owns state: the rules engine validates every proposed change; only the location move needs the ledger.
   const { changes: checked, events } = applyChanges(save, t.state_changes, dice);
   const changes = checked.map((c) => {
@@ -148,9 +157,11 @@ async function handleTurn(request, env) {
     narration: t.narration, options: t.options,
     classification: t.classification, state_changes: changes, events, new_facts: t.new_facts, quest_flags: t.quest_flags,
     location_id: save.scene.location_id,
-    model: result.model, attempts: result.attempts, usage: result.usage, cost: result.cost,
+    model: result.model, attempts: result.attempts, usage: result.usage, cost: result.cost, est_input: result.est,
   };
-  save.recent = [...save.recent, record].slice(-RECENT_TURNS);
+  // Keep turns until the summary has them; the newest RECENT_PROMPT always stay.
+  const all = [...save.recent, record];
+  save.recent = all.filter((r, i) => r.n > save.summary.through_turn || i >= all.length - RECENT_PROMPT).slice(-RECENT_KEEP);
   save.scene = { location_id: save.scene.location_id, narration: t.narration, options: t.options };
   save.turn = n;
   save.counters.ai_turns++;
@@ -159,11 +170,41 @@ async function handleTurn(request, env) {
   const response = { turn: { n, action: action.text, dice, narration: t.narration }, facts_added: factsAdded, events, state: await stateWithSpend(env, save) };
   save.last = { request_id: requestId, response };
   await archiveTurn(env, save, record);
+  const due = summaryDue(save);
+  const job = due && (await getSpend(env)) < capUSD(env) ? summaryJob(save, due) : null;
   await storeSave(env, save);
+  // After the reply: fold old turns into the rolling summary (own KV key, adopted by the next request).
+  if (job) ctx.waitUntil(updateSummary(env, job, (usd) => addSpend(env, usd)));
   return json(response);
 }
 
-async function route(request, env) {
+// Debug view: the prompt the next turn would send (for an example action), section by section, plus the last turn's real usage.
+async function handlePrompt(env) {
+  const save = (await loadSave(env)) || newGame(SLOT);
+  const sum = await adoptSummary(env, save);
+  const p = buildPrompt(save, { kind: "look", text: "Look around" }, null);
+  const last = save.recent.at(-1);
+  const due = summaryDue(save);
+  return json({
+    turn: save.turn,
+    example_action: "Look around",
+    model: env.TURN_MODEL || DEFAULT_TURN_MODEL,
+    summary_model: env.SUMMARY_MODEL || DEFAULT_SUMMARY_MODEL,
+    budget: BUDGET,
+    est: p.est,
+    sections: p.sections,
+    last: last ? { n: last.n, model: last.model, attempts: last.attempts, usage: last.usage, cost: last.cost, est_input: last.est_input } : null,
+    summary: {
+      through_turn: save.summary.through_turn,
+      words: save.summary.text ? save.summary.text.split(/\s+/).length : 0,
+      next_due_at_turn: due ? save.turn : save.summary.through_turn + RECENT_PROMPT + SUMMARY_BATCH,
+      last_cost: sum?.cost, last_model: sum?.model, error: sum?.error,
+    },
+    counters: save.counters,
+  });
+}
+
+async function route(request, env, ctx) {
   const { pathname } = new URL(request.url);
   if (pathname === "/api/health") {
     return json({ ok: true, server: SERVER_VERSION, configured: { api_key: !!env.ANTHROPIC_API_KEY, game_key: !!env.GAME_KEY, storage: !!env.GAME } });
@@ -181,7 +222,8 @@ async function route(request, env) {
     const save = (await loadSave(env)) || newGame(SLOT);
     return json(ledgerView(save));
   }
-  if (pathname === "/api/turn" && request.method === "POST") return handleTurn(request, env);
+  if (pathname === "/api/prompt" && request.method === "GET") return handlePrompt(env);
+  if (pathname === "/api/turn" && request.method === "POST") return handleTurn(request, env, ctx);
   if (pathname === "/api/new" && request.method === "POST") {
     const { body, error } = await readBody(request);
     if (error) return json({ error }, 400);
@@ -196,12 +238,12 @@ async function route(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const cors = corsHeaders(env, request.headers.get("Origin") || "");
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     let res;
     try {
-      res = await route(request, env);
+      res = await route(request, env, ctx);
     } catch (err) {
       console.log(JSON.stringify({ event: "error", message: String(err?.stack || err) }));
       res = json({ error: "server_error" }, 500);

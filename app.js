@@ -48,10 +48,11 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.15"; // stamped by stamp.py
+const JS_BUILD = "1.17"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Look", "Talk", "Travel", "Rest"];
-const MORE = ["Ledger", "Inventory", "Wildcard", "Custom action"];
+const MORE = ["Ledger", "Prompt", "Inventory", "Wildcard", "Custom action"];
+const PANELS = new Set(["Ledger", "Prompt"]); // open inside the More sheet
 const DEFAULT_SERVER = "https://ai-rpg.mr-tom-richter.workers.dev"; // not a secret; the game key is typed in on the phone
 const LS = { server: "rpg.server", key: "rpg.key", pending: "rpg.pending" };
 
@@ -371,7 +372,7 @@ async function openLedger() {
       if (e.type !== last) { body.append(el("h3", "", TYPE_TITLES[e.type] || e.type)); last = e.type; }
       const card = el("div", "ledger-entity");
       card.append(el("div", "ledger-name", e.name));
-      const meta = [e.where && `at ${e.where}`, e.links.length && `links: ${e.links.join(", ")}`].filter(Boolean).join(" · ");
+      const meta = [e.where && `at ${e.where}`, e.links.length && `links: ${e.links.join(", ")}`, e.aliases?.length && `also: ${e.aliases.join(", ")}`].filter(Boolean).join(" · ");
       if (meta) card.append(el("div", "ledger-meta", meta));
       for (const f of e.facts) card.append(el("div", "ledger-fact", "• " + f));
       body.append(card);
@@ -382,8 +383,46 @@ async function openLedger() {
   }
 }
 
+// ---- Prompt (debug view of what the AI is sent; built by the server from the save, no AI call) ----
+const fmtUsd = (n) => (typeof n === "number" ? "$" + n.toFixed(4) : "?");
+
+async function openPrompt() {
+  const body = $("ledgerBody");
+  body.replaceChildren(el("p", "note", "Loading…"));
+  showLedger(true);
+  if (!online()) { body.replaceChildren(el("p", "note", "The prompt is built on the server. Go back and connect a server first.")); return; }
+  try {
+    const { status, data } = await api("/api/prompt");
+    if (status !== 200) { body.replaceChildren(el("p", "note", `Couldn't load the prompt (${status}).`)); return; }
+    body.replaceChildren();
+    const d = data;
+    body.append(el("p", "note", `Next prompt (turn ${d.turn}, example action "${d.example_action}") · ${d.model}`));
+    body.append(ledgerLine("Estimate", `~${d.est.total} tokens, ~${d.est.cached} of them cacheable`));
+    if (d.last) {
+      const u = d.last.usage || {};
+      body.append(ledgerLine(`Last turn ${d.last.n}`, `input ${u.input_tokens ?? "?"} + cache read ${u.cache_read_input_tokens ?? 0} + cache write ${u.cache_creation_input_tokens ?? 0}, output ${u.output_tokens ?? "?"} · ${fmtUsd(d.last.cost)}` +
+        (d.last.attempts > 1 ? ` · ${d.last.attempts} attempts` : "") + (d.last.est_input ? ` · estimate was ~${d.last.est_input}` : "")));
+    }
+    const s = d.summary;
+    body.append(ledgerLine("Summary", `through turn ${s.through_turn}, ${s.words} words · next at turn ${s.next_due_at_turn}` + (s.last_cost ? ` · last ${fmtUsd(s.last_cost)} (${s.last_model})` : "") + (s.error ? ` · last try failed: ${s.error}` : "")));
+    const c = d.counters;
+    const kinds = Object.entries(c.kinds || {}).map(([k, n]) => `${k} ${n}`).join(", ") || "none yet";
+    body.append(ledgerLine("Counters", `AI turns ${c.ai_turns}, fallbacks ${c.fallbacks}, retries ${c.retries}, merges ${c.merges}, repeats dropped ${c.options_dropped}, low-variety turns ${c.variety_low} · option kinds: ${kinds}`));
+    for (const sec of d.sections) {
+      const box = el("details", "prompt-sec");
+      const over = sec.budget && sec.tokens > sec.budget;
+      box.append(el("summary", over ? "over" : "", `${sec.name} · ${sec.tokens}${sec.budget ? " / " + sec.budget : ""} tok${sec.cached ? " · cached" : ""}`));
+      box.append(el("pre", "", sec.text || "(empty)"));
+      body.append(box);
+    }
+  } catch {
+    body.replaceChildren(el("p", "note", "Couldn't reach the server."));
+  }
+}
+
 function useGeneric(label) {
   if (label === "Ledger") { openLedger(); return; }
+  if (label === "Prompt") { openPrompt(); return; }
   if (label === "Custom action") { openCustom(); return; }
   if (online() && label === "Look") { act({ kind: "look" }, "Look around"); return; }
   if (online() && label === "Talk") { act({ kind: "talk" }, "Talk to someone nearby"); return; }
@@ -405,7 +444,7 @@ function buildGeneric() {
   for (const label of MORE) {
     const btn = el("button", "", label);
     btn.type = "button";
-    btn.addEventListener("click", () => { if (label !== "Ledger") setSheet(false); useGeneric(label); });
+    btn.addEventListener("click", () => { if (!PANELS.has(label)) setSheet(false); useGeneric(label); });
     $("sheetBody").append(btn);
   }
   backdrop.addEventListener("click", () => setSheet(false));

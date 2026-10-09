@@ -14,6 +14,14 @@ Secrets live only in the Cloudflare dashboard (Worker → Settings → Variables
 
 Rules (Phase 3) live in `worker/src/rules.js`: seeded d20 (one die per game+turn, so retries never reroll), difficulty clamp by level and location danger, XP/levels, gear and loot tables, validation of the AI's proposed state changes. More → Ledger shows the memory read-only (`GET /api/ledger`).
 
+Prompt (Phase 4) lives in `worker/src/prompt.js`: a token budget per section keeps every turn at roughly 1.5-4.5k input tokens
+however long the campaign runs. Rules and setting are a cached system prefix; summary and quest are a second cached block.
+Turns since the summary go in verbatim (newest 5) or in brief. `worker/src/summary.js` folds old turns into a rolling summary
+of at most 250 words, with Haiku in the background every 5 turns (own KV key `sum:<game id>`, adopted on the next request).
+Duplicate entities merge through the `was` field of new_facts. More → Prompt shows the next prompt section by section with
+token estimates, the last turn's real usage and cost, and counters (`GET /api/prompt`). Optional variable `SUMMARY_MODEL`
+(default claude-haiku-5-5).
+
 Before each deploy run `python3 stamp.py` (stamps build number and time into index.html, style.css and app.js; shown in the More sheet).
 
 Local testing without spending credit: `cd worker && npm install && npm test`; for a full loop,

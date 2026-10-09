@@ -14,7 +14,7 @@ const good = () => ({
   ],
   classification: "allowed",
   state_changes: [{ actor: "pc", kind: "hp", amount: -2, text: "", reason: "cut" }, { actor: "ghost", kind: "hp", amount: 5, text: "", reason: "" }],
-  new_facts: [{ entity: "Maren", type: "npc", fact: "Sews seals", location: "" }, { entity: "", type: "npc", fact: "x", location: "" }],
+  new_facts: [{ entity: "Maren", type: "npc", fact: "Sews seals", location: "", was: "" }, { entity: "", type: "npc", fact: "x", location: "", was: "" }],
   quest_flags: ["met_maren"],
 });
 
@@ -55,14 +55,15 @@ test("new_facts create, dedupe and link entities", () => {
   assert.ok(s.ledger.entities["location-the-rusted-ford"].connections.includes(gull.id));
 });
 
-test("retrieval stays capped and matches whole words only", () => {
+test("retrieval ranks the current place first and matches whole words only", () => {
   const s = newGame();
   for (let i = 0; i < 30; i++) applyNewFacts(s, [{ entity: `Drover ${i}`, type: "npc", fact: "Drinks", location: "The Rusted Ford" }], 2);
   applyNewFacts(s, [{ entity: "Ash", type: "item", fact: "grey", location: "Far Hill" }], 2);
   const list = relevantEntities(s, "I poke the ashes");
-  assert.equal(list.length, 10);
+  assert.equal(list.length, 20);
   assert.ok(!list.some((e) => e.name === "Ash"));
   assert.equal(list[0].name, "The Rusted Ford");
+  assert.ok(relevantEntities(s, "Ask Drover 7 about the ash").slice(0, 3).some((e) => e.name === "Ash"));
 });
 
 test("prompt size stays flat as the ledger grows", () => {

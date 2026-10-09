@@ -93,7 +93,7 @@ test("v1 saves migrate to the rules engine", () => {
   s.actors.pc.equipment = { weapon: { id: "item-worn-shortsword", name: "Worn shortsword" } };
   delete s.ledger.entities["location-the-rusted-ford"].danger;
   migrate(s);
-  assert.equal(s.v, 2);
+  assert.equal(s.v, 3);
   assert.equal(s.actors.pc.equipment.weapon.damage, 3);
   assert.equal(s.ledger.entities["location-the-rusted-ford"].danger, 0);
   assert.deepEqual(s.counters.dc, {});

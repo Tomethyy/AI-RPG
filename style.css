@@ -8,7 +8,7 @@
   --accent: #d9a441;
   --good: #7fb069;
   --bad: #d96459;
-  --build: "1.15";
+  --build: "1.17";
   color-scheme: dark;
 }
 
@@ -168,5 +168,9 @@ button:disabled { opacity: 0.4; }
 .ledger-fact { font-size: 13.5px; line-height: 1.35; color: var(--text); margin-top: 3px; }
 .ledger-line { margin: 0; font-size: 13.5px; line-height: 1.4; color: var(--text); }
 .ledger .note { margin: 0; font-size: 13px; color: var(--muted); }
+.prompt-sec { border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.prompt-sec summary { padding: 10px; font-size: 13.5px; color: var(--text); }
+.prompt-sec summary.over { color: var(--accent); }
+.prompt-sec pre { margin: 0; padding: 0 10px 10px; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--muted); }
 .sheet button.ghost { background: transparent; color: var(--muted); }
 .dice-note { font-size: 12px; color: var(--muted); margin-top: 2px; }

@@ -1,5 +1,6 @@
 // Local stand-in for the Claude API, for testing the Worker without spending credit.
 // POST /__queue with a JSON array of modes ("valid", "invalid", "refusal", "error500", "badjson") to script replies.
+// Requests without a JSON schema are rolling-summary calls and get a plain-text summary.
 import http from "node:http";
 import fs from "node:fs";
 
@@ -20,9 +21,9 @@ function turnJSON() {
     classification: "allowed",
     state_changes: n % 3 === 0 ? [{ actor: "pc", kind: "item_add", amount: 1, text: "Iron dagger", reason: "found" }, { actor: "pc", kind: "xp", amount: 9, text: "", reason: "clever" }] : n === 2 ? [{ actor: "pc", kind: "move", amount: 0, text: "Gull's Landing", reason: "walked there" }, { actor: "nobody", kind: "hp", amount: -3, text: "", reason: "x" }] : [{ actor: "pc", kind: "hp", amount: -2, text: "", reason: "scuffle" }],
     new_facts: [
-      { entity: "Maren", type: "npc", fact: "Sews seals onto satchels", location: "The Rusted Ford" },
-      { entity: "Gull's Landing", type: "location", fact: "A ferry landing downriver", location: "The Rusted Ford" },
-      { entity: "Maren", type: "npc", fact: "Sews seals onto satchels", location: "" },
+      { entity: n === 1 ? "The woman by the hearth" : "Maren", type: "npc", fact: n === 1 ? "Sews a seal onto a satchel" : "Sews seals onto satchels", location: "The Rusted Ford", was: n === 2 ? "the woman by the hearth" : "" },
+      { entity: "Gull's Landing", type: "location", fact: "A ferry landing downriver", location: "The Rusted Ford", was: "" },
+      { entity: "Maren", type: "npc", fact: "Sews seals onto satchels", location: "", was: "" },
     ],
     quest_flags: [],
   };
@@ -34,6 +35,14 @@ http.createServer((req, res) => {
   req.on("end", () => {
     if (req.url === "/__queue") { queue = JSON.parse(body); res.end("ok"); return; }
     fs.appendFileSync(logFile, JSON.stringify({ url: req.url, headers: req.headers, body: JSON.parse(body) }) + "\n");
+    const call = JSON.parse(body);
+    if (!call.output_config?.format) {
+      const last = [...JSON.stringify(call.messages).matchAll(/Turn (\d+)\./g)].map((m) => m[1]).at(-1);
+      const msg = { id: "msg_mock_sum", type: "message", role: "assistant", model: call.model, content: [{ type: "text", text: `Mock summary through turn ${last}. Ash met Maren at the Rusted Ford.` }], stop_reason: "end_turn", stop_details: null, usage: { input_tokens: 1800, output_tokens: 300, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } };
+      res.writeHead(200, { "content-type": "application/json", "request-id": "req_mock_sum" });
+      res.end(JSON.stringify(msg));
+      return;
+    }
     const mode = queue.shift() || "valid";
     if (mode === "error500") { res.writeHead(500, { "content-type": "application/json" }); res.end('{"type":"error","error":{"type":"api_error","message":"boom"}}'); return; }
     let text = JSON.stringify(turnJSON());

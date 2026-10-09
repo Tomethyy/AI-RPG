@@ -1,10 +1,13 @@
 // One AI turn: prompt assembly, structured JSON output, validation with retry, safe fallback.
 import Anthropic from "@anthropic-ai/sdk";
-import { STATS, ENTITY_TYPES, OPTION_KINDS, CLASSIFICATIONS, CHANGE_KINDS, locationName } from "./schema.js";
-import { relevantEntities } from "./ledger.js";
+import { STATS, ENTITY_TYPES, OPTION_KINDS, CLASSIFICATIONS, CHANGE_KINDS } from "./schema.js";
+import { norm } from "./ledger.js";
+import { buildPrompt } from "./prompt.js";
+
+export { buildPrompt };
 
 export const DEFAULT_TURN_MODEL = "claude-sonnet-5-5";
-export const DEFAULT_SUMMARY_MODEL = "claude-haiku-5-5"; // used by the rolling summary (Phase 4)
+export const DEFAULT_SUMMARY_MODEL = "claude-haiku-5-5"; // rolling summary (summary.js)
 const MAX_ATTEMPTS = 2; // first try + one retry
 const MAX_TOKENS = 4000; // thinking + JSON; bounds the cost of a single call
 
@@ -49,89 +52,13 @@ export const OUTPUT_SCHEMA = {
       type: "array",
       items: {
         type: "object", additionalProperties: false,
-        required: ["entity", "type", "fact", "location"],
-        properties: { entity: str, type: { type: "string", enum: ENTITY_TYPES }, fact: str, location: str },
+        required: ["entity", "type", "fact", "location", "was"],
+        properties: { entity: str, type: { type: "string", enum: ENTITY_TYPES }, fact: str, location: str, was: str },
       },
     },
     quest_flags: { type: "array", items: str },
   },
 };
-
-// Static part of the system prompt: identical every turn, so it is cached.
-const RULES = `You are the narrator of a solo text RPG played on a phone. The app owns all state, rules and dice; you only narrate and propose.
-
-Each turn you get the character sheet, the story summary, the quest, known facts, recent turns, and the player's action with its dice result (if any). Reply with one JSON object.
-
-narration: 1-3 short paragraphs (about 60-140 words total), second person, present tense. Narrate the outcome of the action, honoring the dice result exactly: a failure must cost or complicate something, a success must move things forward. Never contradict the known facts. Do not restate the previous scene or the player's action. End on a concrete situation the player can act on.
-
-options: 3 or 4 next actions, specific to this scene, each under 12 words, in the player's voice ("Ask Maren about the satchel"). Make them differ in kind (social, explore, direct, cautious, other). At least one must advance the focused quest. Never hint at risk, odds or reward in the text. Do not repeat recently offered options. Give each a stat (might = force and physical feats, wits = perception, knowledge and talk, grit = endurance, nerve and stealth) and a difficulty from 6 (easy) to 18 (very hard).
-
-classification: for a free-text action, "allowed", "conditional" (possible but harder), or "blocked" (conflicts with established facts, skips the story, or is implausible). Never answer a blocked action with a bare refusal: show the in-world consequence, a reaction, or why it cannot work. For options you offered, use "allowed".
-
-state_changes: changes the story implies, as proposals the app will check. actor is "pc" for the player. kind: hp (amount = change, negative for harm), xp (amount gained), item_add / item_remove (text = item name, amount = quantity), condition_add / condition_remove (text = condition), move (text = name of the new location). reason: a few words. Empty list if nothing changed.
-
-new_facts: EVERY named person, place, faction, item or quest you introduced or revealed this turn, and any new fact about a known one, one short fact per entry (entity = its name; location = the place it is at, or "" if unknown or not a physical thing). Reusing a known name is fine. If you named it, list it.
-
-quest_flags: short flags when the story meets a milestone condition, e.g. "learned_who_burned_bridge". Empty list otherwise.`;
-
-function sign(n) { return (n >= 0 ? "+" : "") + n; }
-
-function characterBlock(save) {
-  const lines = [];
-  for (const id of save.party) {
-    const a = save.actors[id];
-    const eq = Object.entries(a.equipment).filter(([, v]) => v).map(([slot, v]) => `${slot} ${v.name}`).join(", ") || "none";
-    const inv = a.inventory.map((i) => (i.qty > 1 ? `${i.name} x${i.qty}` : i.name)).join(", ") || "nothing";
-    lines.push(`${a.name} [${a.id}${a.kind === "pc" ? ", the player" : ""}]: level ${a.level}, XP ${a.xp}, HP ${a.hp}/${a.hp_max}. ` +
-      STATS.map((s) => `${s} ${sign(a.stats[s])}`).join(", ") + `.\nEquipment: ${eq}. Inventory: ${inv}. Conditions: ${a.conditions.join(", ") || "none"}.`);
-  }
-  return lines.join("\n");
-}
-
-function questBlock(save) {
-  const q = save.quests.main;
-  const cur = q.milestones[q.current];
-  const next = cur?.next.map((id) => q.milestones[id]?.title).filter(Boolean)[0];
-  const focus = save.quests.focus === "main" ? `the main quest (${q.title})` : save.quests.side[save.quests.focus]?.title || q.title;
-  return `Main quest: ${q.title}\nCurrent milestone: ${cur ? `${cur.title} (met when: ${cur.conditions.join("; ")})` : "none"}\n` +
-    (next ? `Hint of what follows: ${next}\n` : "") + `Focused quest: ${focus}`;
-}
-
-function rollText(dice) {
-  if (!dice) return "No roll.";
-  return `d20 ${dice.die} ${sign(dice.mod)} ${dice.label} = ${dice.die + dice.mod} vs difficulty ${dice.dc}: ${dice.success ? "SUCCESS" : "FAILURE"}.`;
-}
-
-export function buildPrompt(save, action, dice) {
-  const system = [
-    { type: "text", text: RULES },
-    {
-      type: "text",
-      text: `Setting: ${save.settings.setting}\nTone: ${save.settings.tone}\nWrite everything in ${save.settings.language}.`,
-      cache_control: { type: "ephemeral" },
-    },
-  ];
-  const ledger = relevantEntities(save, action.text);
-  const ledgerText = ledger.map((e) => `- ${e.name} (${e.type}${e.where ? `, at ${e.where}` : ""}): ${e.facts.join("; ") || "no facts yet"}`).join("\n") || "(none yet)";
-  const earlier = save.recent.filter((t) => t.n < save.turn);
-  const recentText = earlier.map((t) => `Turn ${t.n}. Player: ${t.action.text}. ${rollText(t.dice)}\n${t.narration.join(" ")}`).join("\n\n") || "(none)";
-  const current = new Set(save.scene.options.map((o) => o.text));
-  const recentOptions = [...new Set(save.recent.slice(-4).flatMap((t) => t.options.map((o) => o.text)))].filter((t) => !current.has(t));
-  const led = save.recent.at(-1)?.n === save.turn ? save.recent.at(-1) : null;
-  const kindLabel = { option: "chose an offered option", custom: "typed a free-text action", look: "looks around", talk: "talks to someone nearby" }[action.kind];
-  const user = [
-    `## Character\n${characterBlock(save)}`,
-    `## Story so far\n${save.summary.text || "(The story has just begun.)"}`,
-    `## Quest\n${questBlock(save)}`,
-    `## Known facts\n${ledgerText}`,
-    `## Earlier turns\n${recentText}`,
-    `## Current scene (turn ${save.turn}) at ${locationName(save, save.scene.location_id)}\n` +
-      (led ? `Player: ${led.action.text}. ${rollText(led.dice)}\n` : "") + `${save.scene.narration.join("\n")}\nOptions shown: ${save.scene.options.map((o) => o.text).join(" | ")}`,
-    recentOptions.length ? `## Recently offered options (do not repeat)\n${recentOptions.join(" | ")}` : "",
-    `## Player action (the player ${kindLabel})\n"${action.text}"\nDice: ${rollText(dice)}\n\nWrite turn ${save.turn + 1}.`,
-  ].filter(Boolean).join("\n\n");
-  return { system, messages: [{ role: "user", content: user }] };
-}
 
 // Check the parsed reply and normalize it. Returns { turn, errors }; errors means retry.
 export function validateTurn(raw, save) {
@@ -165,19 +92,37 @@ export function validateTurn(raw, save) {
   const new_facts = (Array.isArray(raw.new_facts) ? raw.new_facts : [])
     .filter((f) => f && String(f.entity || "").trim() && String(f.fact || "").trim())
     .slice(0, 15)
-    .map((f) => ({ entity: String(f.entity).trim().slice(0, 80), type: ENTITY_TYPES.includes(f.type) ? f.type : "lore", fact: String(f.fact).trim(), location: String(f.location || "").trim().slice(0, 80) }));
+    .map((f) => ({ entity: String(f.entity).trim().slice(0, 80), type: ENTITY_TYPES.includes(f.type) ? f.type : "lore", fact: String(f.fact).trim(), location: String(f.location || "").trim().slice(0, 80), was: String(f.was || "").trim().slice(0, 80) }));
   const quest_flags = (Array.isArray(raw.quest_flags) ? raw.quest_flags : []).map((s) => String(s).slice(0, 60)).filter(Boolean).slice(0, 8);
 
   return { turn: errors.length ? null : { narration, options: options.slice(0, 4), classification, state_changes, new_facts, quest_flags }, errors };
 }
 
+// Option variety without extra calls: drop repeats of recently offered options (while 3 remain) and count low-variety turns.
+const words = (t) => new Set(norm(t).split(" ").filter((w) => w.length > 2));
+function similar(a, b) {
+  const A = words(a), B = words(b);
+  if (!A.size || !B.size) return norm(a) === norm(b);
+  let both = 0;
+  for (const w of A) if (B.has(w)) both++;
+  return both / Math.max(A.size, B.size) >= 0.75;
+}
+
+export function varyOptions(save, options) {
+  const recent = [...save.scene.options, ...save.recent.slice(-3).flatMap((t) => t.options)].map((o) => o.text);
+  let removable = options.length - 3;
+  const kept = options.filter((o) => {
+    if (removable > 0 && recent.some((r) => similar(o.text, r))) { removable--; return false; }
+    return true;
+  });
+  const kinds = new Set(kept.map((o) => o.kind)).size;
+  return { options: kept, dropped: options.length - kept.length, low: kinds < Math.min(3, kept.length) };
+}
+
 const FALLBACK_OK = /^claude-(sonnet-5-5|opus-5-5|opus-5|fable-5-1)$/;
 
-// Calls the model up to MAX_ATTEMPTS times. Returns { turn, model, usage, cost, attempts, error }.
-// cost covers every billed attempt, failed ones included, so the daily cap sees them.
-export async function runTurn(env, save, action, dice) {
-  const model = env.TURN_MODEL || DEFAULT_TURN_MODEL;
-  const client = new Anthropic({
+export function makeClient(env) {
+  return new Anthropic({
     apiKey: env.ANTHROPIC_API_KEY,
     baseURL: env.ANTHROPIC_BASE_URL || undefined,
     // Organization-level keys must name a workspace on every request; workspace keys don't need this.
@@ -185,14 +130,22 @@ export async function runTurn(env, save, action, dice) {
     maxRetries: 1,
     timeout: 60_000,
   });
-  const { system, messages } = buildPrompt(save, action, dice);
+}
+
+// Calls the model up to MAX_ATTEMPTS times. Returns { turn, model, usage, cost, attempts, error, est }.
+// cost covers every billed attempt, failed ones included, so the daily cap sees them.
+export async function runTurn(env, save, action, dice) {
+  const model = env.TURN_MODEL || DEFAULT_TURN_MODEL;
+  const client = makeClient(env);
+  const { system, messages, est } = buildPrompt(save, action, dice);
   let useFallbacks = FALLBACK_OK.test(model);
   let lastError = "";
   let total = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
   let cost = 0;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // The retry note goes after the cached blocks, so a retry still reads the cache.
     const msgs = attempt === 1 ? messages : [
-      { role: "user", content: messages[0].content + `\n\nYour previous reply was rejected: ${lastError}. Reply again, following the rules exactly.` },
+      { role: "user", content: [...messages[0].content, { type: "text", text: `Your previous reply was rejected: ${lastError}. Reply again, following the rules exactly.` }] },
     ];
     const params = {
       model,
@@ -221,10 +174,10 @@ export async function runTurn(env, save, action, dice) {
     let raw;
     try { raw = JSON.parse(text); } catch { lastError = "reply was not valid JSON"; continue; }
     const { turn, errors } = validateTurn(raw, save);
-    if (turn) return { turn, model: res.model || model, usage: total, cost, attempts: attempt };
+    if (turn) return { turn, model: res.model || model, usage: total, cost, attempts: attempt, est: est.total };
     lastError = errors.join("; ");
   }
-  return { turn: null, model, usage: total, cost, attempts: MAX_ATTEMPTS, error: lastError };
+  return { turn: null, model, usage: total, cost, attempts: MAX_ATTEMPTS, error: lastError, est: est.total };
 }
 
 // Safe turn when the AI is unavailable: nothing in the save changes, the player sees the same options again.

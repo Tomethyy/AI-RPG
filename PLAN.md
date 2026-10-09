@@ -206,7 +206,7 @@ Runtime models for the game itself are a separate question (see Open questions a
 
 ## Should have (schedule, may slip)
 
-- Ledger duplicate names: the same person can end up as two entities (e.g. "The woman by the hearth", then "Maren" once named). Merge or alias them on rename. Look at it in Phase 4 (retrieval) and measure it in the Phase 8 bot runs; the Codex in Phase 7 gets edit/merge.
+- Ledger duplicate names: the same person can end up as two entities (e.g. "The woman by the hearth", then "Maren" once named). Merge or alias them on rename. Phase 4 added a `was` field to new_facts: code renames the entity, keeps the old name as an alias and merges two records if both exist (counted as `merges`). Measure it in the Phase 8 bot runs; the Codex in Phase 7 gets manual edit/merge.
 
 - Regenerate narration/options with the dice result kept fixed
 - Pressure on the player: day counter and consumable supplies, or a threat clock on the main quest (needs a decision)
