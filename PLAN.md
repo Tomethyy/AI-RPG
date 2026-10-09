@@ -42,6 +42,12 @@ Background research on existing products and the evidence behind these decisions
   - README and this plan (including Status) are updated
 - **Playtest notes:** after each phase I play about 20 turns and name 3 things that feel off; they go into Known issues and are weighed at the start of the next phase.
 
+## Top design principle: continuity
+
+Logical, dramatic and rational continuity matters more than anything else in the story. No curveball every page: new people and plot threads must grow out of what is already established, characters act for stated reasons, and the player's choices must make sense in the story. Every feature is judged against this first.
+
+Root cause seen in play (after Phases 4-5): the AI improvises the plot turn by turn, so it keeps inventing. Prompt rules only soften this. The structural fix is to give the AI a fixed truth to reveal instead of room to invent: a hidden story seed made at game start (who did what and why, the few key people with wants and secrets, the clues), shown to the AI every turn; code-tracked open threads that must advance before new ones start; and measurements in the Prompt view (new named things per turn, contradictions found in bot runs, Phase 9). Region generation, the milestone graph with its leads, and "options that matter" (Phase 7) are the full version.
+
 ## Why this exists
 
 - Old Greg's Tavern and similar apps give too much freedom. I'm not very creative and have no group, so I need the game to hand me concrete next steps.
