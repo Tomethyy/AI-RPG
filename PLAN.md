@@ -52,35 +52,35 @@ Background research on existing products and the evidence behind these decisions
 
 ## v1 scope (frozen)
 
-**Core** = the game is broken, unfair or inconsistent without it. **May slip** = built in its phase if time and the usage limit allow, otherwise it waits until after Phase 9 tuning. Nothing here is dropped; the tag only decides what waits.
+Everything below ships in v1, each item in its phase. If a phase runs long, it is split into parts (e.g. 6a and 6b); items are not postponed past their phase.
 
 Done (Phases 1-4): story loop and options, rules engine (dice, HP, XP, gear, loot, clamped difficulty, visible dice), memory (state, rolling summary, lore ledger, prompt budget and caching), backend (protected proxy, spend cap, JSON validation with retry, server-side saves).
 
-| Item | Phase | Tag |
-|---|---|---|
-| Character creation, revisited stat system, XP pace for a ~150-250 turn game | 5 | Core |
-| Three-result checks, difficulty not tied to level, no retry without change | 5 | Core |
-| Narrator rules (never act or speak for the character, NPCs can refuse and lie, callbacks) | 5 | Core |
-| Talents (abilities to use in and out of combat) | 5 | Core |
-| Advantage / disadvantage | 5 | May slip |
-| Two-axis morality (alignment) | 5 (axes), 7 (reactions) | May slip |
-| Item slots | 5 | May slip |
-| Code combat with enemy tables, item effects, one AI summary | 6 | Core |
-| Fair death: flee/surrender, morale, danger shown first, enemy intent shown, defeat branch, permanent death | 6 | Core |
-| Enemy roles and status effects | 6 | May slip |
-| Unique items with properties or drawbacks | 6 | May slip |
-| Milestone graph with 3 leads per milestone, quest flags, quest focus, side quests | 7 | Core |
-| Threat clock with warning signs, code-owned day and time of day | 7 | Core |
-| Custom action classification and consequence-based responses | 7 | Core |
-| NPC attitude and first-meeting reactions | 7 | Core |
-| Epilogue built from choices (also on death), game-complete state | 7 | Core |
-| Branching finale (falls back to one finale) | 7 | May slip |
-| NPC profiles (want, fear, secret, voice) | 7 | May slip |
-| Text map and Travel, rest with random events, generic buttons, journal, Codex | 8 | Core |
-| New game flow, export/import | 8 | Core |
-| Merchants and shops, difficulty setting, "never include" field | 8 | May slip |
-| Recap on return, streaming narration | 8 | May slip |
-| Location secrets, hall of fallen heroes, text size setting and first-time tips | 8 | May slip |
+| Item | Phase |
+|---|---|
+| Character creation, revisited stat system, XP pace for a ~150-250 turn game | 5 |
+| Three-result checks, difficulty not tied to level, no retry without change | 5 |
+| Narrator rules (never act or speak for the character, NPCs can refuse and lie, callbacks) | 5 |
+| Talents (abilities to use in and out of combat) | 5 |
+| Advantage / disadvantage | 5 |
+| Two-axis morality (alignment) | 5 (axes), 7 (reactions) |
+| Item slots | 5 |
+| Code combat with enemy tables, item effects, one AI summary | 6 |
+| Fair death: flee/surrender, morale, danger shown first, enemy intent shown, defeat branch, permanent death | 6 |
+| Enemy roles and status effects | 6 |
+| Unique items with properties or drawbacks | 6 |
+| Milestone graph with 3 leads per milestone, quest flags, quest focus, side quests | 7 |
+| Threat clock with warning signs, code-owned day and time of day | 7 |
+| Custom action classification and consequence-based responses | 7 |
+| NPC attitude and first-meeting reactions | 7 |
+| Epilogue built from choices (also on death), game-complete state | 7 |
+| Branching finale | 7 |
+| NPC profiles (want, fear, secret, voice) | 7 |
+| Text map and Travel, rest with random events, generic buttons, journal, Codex | 8 |
+| New game flow, export/import | 8 |
+| Merchants and shops, difficulty setting, "never include" field | 8 |
+| Recap on return, streaming narration | 8 |
+| Location secrets, hall of fallen heroes, text size setting and first-time tips | 8 |
 
 If the loop is not fun at this size, extras will not fix it. (Most rows came from the RPG practice reviews after Phase 4, gaps Q-AV in `RESEARCH.md`.)
 
@@ -254,7 +254,7 @@ My usage limit is a real constraint, so default to Sonnet at medium effort and m
 | 5 Character | Sonnet | High | Design-heavy: the stat system is hard to change later. Try Opus if the recommendations feel thin |
 | 6 Combat | Sonnet | High | Grew in the reviews: enemy roles and intent, morale, flee, defeat branch. Deterministic code plus one AI call |
 | 7 Quest structure | Sonnet | High | Milestone graph, leads, threat clock and action classification are prompt-design heavy. Try Opus if the output is poor |
-| 8 Map and polish | Sonnet | Medium | Mostly UI and glue; streaming needs care. Likely split into 8a (map, travel, journal, Codex, new game) and 8b (shops, polish) |
+| 8 Map and polish | Sonnet | Medium | Mostly UI and glue; streaming needs care. Split into 8a (map, travel, journal, Codex, new game) and 8b (shops and the rest) |
 | 9 Tuning | Sonnet | Medium | Reading logs and adjusting. High only for a stubborn problem |
 
 Do not use the highest effort modes (Max, Ultra Code) for this project. The work is well specified.
