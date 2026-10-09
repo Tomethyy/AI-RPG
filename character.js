@@ -270,9 +270,23 @@ async function openCreation() {
 
   async function submit() {
     if (!ready() || !confirm("Start a new game with this character? The current run is replaced (one backup is kept on the server).")) return;
-    const { status, data } = await api("/api/new", { confirm: true, character: { ...pick, name: pick.name.trim() } });
+    // The server writes the opening scene with one AI call, which takes 10-30 seconds: say so, and block a second tap.
+    const begin = $("beginBtn");
+    begin.disabled = true;
+    begin.textContent = "Writing your story…";
+    const wait = el("p", "note pending", "The narrator is writing your opening scene. This takes up to half a minute; please wait.");
+    body.prepend(wait);
+    sheet.scrollTop = 0;
+    let res;
+    try { res = await api("/api/new", { confirm: true, character: { ...pick, name: pick.name.trim() } }); } catch { res = { status: 0, data: null }; }
+    wait.remove();
+    const { status, data } = res;
     if (status === 200) { lsSet(LS.pending, ""); renderFull(data); setSheet(false); }
-    else body.prepend(el("p", "note", `Couldn't start the game (${status}${data?.field ? ": check " + data.field : ""}).`));
+    else {
+      begin.disabled = false;
+      begin.textContent = "Begin";
+      body.prepend(el("p", "note", status ? `Couldn't start the game (${status}${data?.field ? ": check " + data.field : ""}).` : "Couldn't reach the server. Try again."));
+    }
   }
 
   draw();

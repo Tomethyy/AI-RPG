@@ -15,7 +15,8 @@ const RULES = `You keep the running summary of a solo text RPG campaign. You get
 - At most ${SUMMARY_WORDS} words of plain prose, past tense, no headings or lists.
 - Keep what matters later: what the player character did, learned and decided; promises, debts, allies and enemies; open threads and unanswered questions; where the character is now and why.
 - Drop moment-to-moment detail, dice and descriptions. People and places are stored separately, so name them but don't describe them.
-- As the story grows, compress older events harder and keep recent ones more detailed. Never drop an open thread.
+- Say where things stand at the END of the last turn. If an action had only begun there (someone is leaving, a fight is starting), write that it had begun, never that it finished.
+- As the story grows, compress older events harder and keep recent ones more detailed. Never drop an open thread. Stay under the word limit by dropping detail, not threads.
 - Use names exactly as written. Add nothing that is not in the input.
 
 Reply with the summary text only.`;

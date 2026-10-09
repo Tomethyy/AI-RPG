@@ -26,7 +26,7 @@ export function archiveKeys(save, last) {
 }
 
 // records: every archived record found, any order. Returns { text, turns }.
-export function playtestReport(save, records, last, { spend } = {}) {
+export function playtestReport(save, records, last, { spend, model, effort } = {}) {
   const p = save.actors[save.party[0]];
   const from = Math.max(2, save.turn - last + 1);
   const turns = [...new Map(records.map((r) => [r.n, r])).values()].filter((r) => r.n >= from).sort((a, b) => a.n - b.n);
@@ -36,7 +36,7 @@ export function playtestReport(save, records, last, { spend } = {}) {
   prevOptions.set(2, save.intro?.options || null);
 
   const L = [];
-  L.push(`PLAYTEST REPORT · game ${save.id.slice(0, 8)} · now at turn ${save.turn} · showing turns ${turns[0]?.n ?? "-"}-${turns.at(-1)?.n ?? "-"}`);
+  L.push(`PLAYTEST REPORT · game ${save.id.slice(0, 8)} · now at turn ${save.turn}${model ? ` · ${model}, effort ${effort}` : ""} · showing turns ${turns[0]?.n ?? "-"}-${turns.at(-1)?.n ?? "-"}`);
   const bio = p.bio ? `${BACKGROUNDS[p.bio.background]?.name}, drive: ${DRIVES[p.bio.drive]?.name}, flaw: ${FLAWS[p.bio.flaw]?.name}` : "no background (old save)";
   L.push(`${p.name} · ${bio} · level ${p.level} · XP ${p.xp} · HP ${p.hp}/${p.hp_max} · ${alignLabel(p.align)} (law ${p.align.law}, good ${p.align.good})`);
   L.push(`Stats: ${Object.entries(p.stats).map(([k, v]) => `${STAT_LABELS[k]} ${sign(v)}`).join(", ")} · Talents: ${(p.talents || []).map((t) => TALENTS[t.id]?.name).join(", ") || "none"} · Pack ${packUsed(p)}/${packSlots(p)} · Conditions: ${p.conditions.join(", ") || "none"}`);

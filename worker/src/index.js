@@ -241,8 +241,9 @@ async function handlePlaytest(url, env) {
   const records = [...save.recent];
   for (const k of keys) records.push(...((await env.GAME.get(k, "json")) || []));
   const spend = { today: Math.round((await getSpend(env)) * 10000) / 10000, cap: capUSD(env) };
-  const r = playtestReport(save, records, last, { spend });
-  return json({ text: r.text, turns: r.turns, bytes: r.text.length, last, max: PLAYTEST_MAX });
+  const model = env.TURN_MODEL || DEFAULT_TURN_MODEL, effort = env.TURN_EFFORT || "low";
+  const r = playtestReport(save, records, last, { spend, model, effort });
+  return json({ text: r.text, turns: r.turns, bytes: r.text.length, last, max: PLAYTEST_MAX, model, effort });
 }
 
 // Debug view: the prompt the next turn would send (for an example action), section by section, plus the last turn's real usage.
@@ -263,6 +264,7 @@ async function handlePrompt(env) {
     turn: save.turn,
     example_action: "Look around",
     model: env.TURN_MODEL || DEFAULT_TURN_MODEL,
+    effort: env.TURN_EFFORT || "low",
     summary_model: env.SUMMARY_MODEL || DEFAULT_SUMMARY_MODEL,
     budget: BUDGET,
     est,

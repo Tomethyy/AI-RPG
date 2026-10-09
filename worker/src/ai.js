@@ -73,7 +73,9 @@ export const SCHEMA_TOKENS = Math.ceil(SCHEMA_TEXT.length / 4);
 export function validateTurn(raw, save) {
   const errors = [];
   if (!raw || typeof raw !== "object") return { turn: null, errors: ["reply is not a JSON object"] };
-  const narration = (Array.isArray(raw.narration) ? raw.narration : []).map((p) => String(p).trim()).filter(Boolean).slice(0, 5);
+  // A paragraph that ends on a quote mark it never opened loses it ("...on the way.\"").
+  const tidy = (p) => { p = String(p).trim(); return (p.match(/"/g) || []).length % 2 === 1 && p.endsWith('"') ? p.slice(0, -1).trimEnd() : p; };
+  const narration = (Array.isArray(raw.narration) ? raw.narration : []).map(tidy).filter(Boolean).slice(0, 5);
   if (!narration.length) errors.push("narration is empty");
   if (narration.join(" ").length > 3000) errors.push("narration is too long (keep it under 140 words)");
 

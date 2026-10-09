@@ -182,3 +182,11 @@ test("v4 saves migrate to v5", () => {
   assert.equal(s.actors.pc.talents[0].id, "stubborn");
   assert.deepEqual(s.actors.pc.picks[0].offer, ["stubborn", "keen-eye"]);
 });
+
+test("a stray closing quote at the end of a paragraph is removed", () => {
+  const raw = { ...good(), narration: ['She says, "Go," and nods. She is leaving now.', '"I carry, not answer," she says. You have made sure she will not talk to you on the way."', '"Fine." He leaves.'] };
+  const { turn } = validateTurn(raw, newGame());
+  assert.equal(turn.narration[1].endsWith("on the way."), true);
+  assert.equal(turn.narration[2], '"Fine." He leaves.');
+  assert.equal(turn.narration[0], 'She says, "Go," and nods. She is leaving now.');
+});

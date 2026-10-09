@@ -119,7 +119,7 @@ async function openPrompt() {
     if (status !== 200) { body.replaceChildren(el("p", "note", `Couldn't load the prompt (${status}).`)); return; }
     body.replaceChildren();
     const d = data;
-    body.append(el("p", "note", `Next prompt (turn ${d.turn}, example action "${d.example_action}") · ${d.model}`));
+    body.append(el("p", "note", `Next prompt (turn ${d.turn}, example action "${d.example_action}") · ${d.model}, effort ${d.effort}`));
     body.append(ledgerLine("Estimate", `~${d.est.total} tokens including the output schema, ~${d.est.cached} of them cacheable` +
       (d.est.scaled ? ` · scaled by the last turn's real/estimated ratio (${d.ratio}): ~${d.est.scaled}` : "")));
     if (d.last) {
@@ -161,28 +161,44 @@ async function openPlaytest(last) {
     const { status, data } = await api(`/api/playtest?last=${last}`);
     if (status !== 200) { body.replaceChildren(el("p", "note", `Couldn't load the log (${status}).`)); return; }
     body.replaceChildren();
-    body.append(el("p", "note", `${data.turns} turns, ${Math.round(data.bytes / 1024)} KB. Tap Copy, then paste it into the chat.`));
-    const area = el("textarea", "logbox");
-    area.readOnly = true;
-    area.value = data.text;
-    const copy = el("button", "mini", "Copy");
-    copy.type = "button";
-    copy.addEventListener("click", async () => {
-      let ok = false;
-      try { await navigator.clipboard.writeText(data.text); ok = true; } catch {}
-      if (!ok) { area.focus(); area.select(); area.setSelectionRange(0, data.text.length); try { ok = document.execCommand("copy"); } catch {} }
-      copy.textContent = ok ? "Copied" : "Select all and copy by hand";
-    });
-    const row = el("div", "name-row");
-    row.append(copy);
-    for (const n of [10, 25, data.max]) {
-      if (n === last) continue;
-      const b = el("button", "mini ghost", `Last ${n}`);
-      b.type = "button";
-      b.addEventListener("click", () => openPlaytest(n));
-      row.append(b);
+    body.append(el("p", "note", `${data.turns} turns, ${Math.round(data.bytes / 1024)} KB, model ${data.model}, effort ${data.effort}.`));
+    // The text is split into parts of about 12,000 characters so each paste into a chat stays small.
+    const parts = [];
+    let rest = data.text;
+    while (rest.length > 12000) {
+      const cut = rest.lastIndexOf("\n", 12000);
+      parts.push(rest.slice(0, cut > 4000 ? cut : 12000));
+      rest = rest.slice(cut > 4000 ? cut + 1 : 12000);
     }
-    body.append(row, area);
+    parts.push(rest);
+    const msg = el("p", "note", "");
+    const area = el("textarea", "logbox");
+    area.value = data.text;
+    const copyText = async (text, label) => {
+      let ok = false;
+      try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+      if (!ok) { // iOS fallback: select the text in an editable element and use the old copy command
+        const t = document.createElement("textarea");
+        t.value = text; t.contentEditable = "true"; t.readOnly = false;
+        t.style.cssText = "position:fixed;top:0;left:0;opacity:0;font-size:16px";
+        document.body.append(t);
+        const range = document.createRange();
+        range.selectNodeContents(t);
+        const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        t.setSelectionRange(0, text.length);
+        try { ok = document.execCommand("copy"); } catch {}
+        t.remove();
+      }
+      msg.textContent = ok ? `Copied ${label}. Now paste it into the chat.` : "Copy was blocked. Tap Share, or tap the text below, Select All, and Copy.";
+    };
+    const row = el("div", "name-row");
+    const addBtn = (text, cls, fn) => { const b = el("button", cls, text); b.type = "button"; b.addEventListener("click", fn); row.append(b); return b; };
+    if (parts.length === 1) addBtn("Copy", "mini", () => copyText(data.text, "the log"));
+    else parts.forEach((p, i) => addBtn(`Copy ${i + 1}/${parts.length}`, "mini", () => copyText(p, `part ${i + 1} of ${parts.length}`)));
+    if (navigator.share) addBtn("Share", "mini ghost", async () => { try { await navigator.share({ text: data.text }); } catch {} });
+    const row2 = el("div", "name-row");
+    for (const n of [10, 25, data.max]) if (n !== last) { const b = el("button", "mini ghost", `Last ${n}`); b.type = "button"; b.addEventListener("click", () => openPlaytest(n)); row2.append(b); }
+    body.append(el("p", "note", parts.length > 1 ? `Long log: copy and paste it in ${parts.length} parts, in order.` : ""), row, msg, row2, area);
   } catch {
     body.replaceChildren(el("p", "note", "Couldn't reach the server."));
   }

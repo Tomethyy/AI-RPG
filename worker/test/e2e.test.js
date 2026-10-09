@@ -171,7 +171,9 @@ test("a 30-turn game: creation, turns, level-ups, talents, fact merge, summaries
   // the playtest report: pasteable text with the hidden tiers, dice, ledger and new names
   const rep = (await call(env, "GET", "/api/playtest?last=8")).data;
   assert.equal(rep.turns, 8);
-  assert.match(rep.text, /^PLAYTEST REPORT/);
+  assert.match(rep.text, /^PLAYTEST REPORT.*claude-sonnet-5-5, effort low/);
+  assert.equal(rep.effort, "low");
+  assert.equal((await call(makeEnv(kv, { TURN_EFFORT: "medium" }), "GET", "/api/prompt")).data.effort, "medium");
   assert.match(rep.text, /## Turn 31 /);
   assert.ok(!rep.text.includes("## Turn 22 "));
   assert.match(rep.text, /Player \(option\): .* \[(social|explore|direct|cautious), (might|wits|charm|grit), (easy|standard|hard|daunting)/);
