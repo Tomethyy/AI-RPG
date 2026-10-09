@@ -48,7 +48,7 @@ Background research on existing products and the evidence behind these decisions
 | Topic | Decision |
 |---|---|
 | Setting | v1 has one fixed world: classic medieval fantasy with low magic. Humans dominate; magic is real but rare, costly and distrusted; monsters live at the edges (wolves, bandits, the odd troll or ghost), in the spirit of The Witcher or Dragon Age. Choosing other settings (cyberpunk, pirates, ...) is v2 |
-| Content tables | Mixed: anything that sets a number is hand-written in small JSON files in the Worker (Claude drafts, I skim): enemy templates by role and tier, consumables, talents, prices, rarity, ~20 item properties and ~15 drawbacks. Everything readable is AI-generated per region on top of them (local creatures as instances of templates, unique items as a concept plus a property and drawback picked from the code list, event scenes from code-picked event types). Code checks every generated piece against its template. Start small, grow in Phase 9 where play shows repetition |
+| Content tables | **Not decided yet.** Decided at the start of the phase that first needs a table (Phase 5: talents). Proposal on the table: hand-written numbers in small JSON files, AI-generated names and flavor per region on top, checked against the templates. Alternatives: fully hand-written, or AI-generated within code limits |
 | Map bounds | The generated region is the map: its places plus a few the AI may add inside it (capped). Far places from the world core are known by name but lie beyond this story |
 | Side quests | Seeded and earned: region generation seeds 2-3 side quests tied to its factions and NPCs (with leads); in play the AI may propose new ones from what happens, at most one new open side quest at a time and a total cap |
 | World and lore | Two layers. A hand-written **world core**, fixed for v1 and cached in the prompt (~500 tokens, near zero cost per turn): the realm and its regions, a short history, how magic works and why it is distrusted, the main religion, 3-4 major powers, which monsters exist. Plus a **region generated once per New game** inside that world: starting area, 6-8 places, 3-4 local factions with goals, key NPCs, the central conflict, with the milestone graph and threat clock built on it, stored in the ledger. Every run gets new names and a new story in the same world |
@@ -94,8 +94,8 @@ Done (Phases 1-4): story loop and options, rules engine (dice, HP, XP, gear, loo
 | Fair death: flee/surrender, morale, danger shown first, enemy intent shown, defeat branch, permanent death | 6 |
 | Enemy roles and status effects | 6 |
 | Unique items with properties or drawbacks | 6 |
-| Region generated per game (places, factions, NPCs, conflict, personal stake, seeded side quests, local creatures and wares) with the milestone graph | 7 |
-| Content tables in JSON (enemy templates, consumables, talents, prices, item properties and drawbacks), each written in the phase that first needs it | 5-8 |
+| Region generated per game (places, factions, NPCs, conflict, personal stake, seeded side quests) with the milestone graph | 7 |
+| Content tables (enemy templates, consumables, talents, prices, item properties and drawbacks); how they are made is decided in the phase that first needs each | 5-8 |
 | Milestone graph with 3 leads per milestone, quest flags, quest focus, side quests | 7 |
 | Threat clock with warning signs, code-owned day and time of day | 7 |
 | Custom action classification and consequence-based responses | 7 |
@@ -140,7 +140,7 @@ Look around, Talk to someone, Travel, Rest, Check inventory, Wildcard (random ev
 - **Personal stake:** character creation picks a background and a drive; region generation must give the character a personal stake in the central conflict (a debt, a missing sibling, a stolen inheritance), and the opening scene starts from it.
 - **Region bounds:** the region is the map. The AI may add a few places inside it (capped, e.g. 4 more); far places from the world core are named but out of reach in this story.
 - **Side quests:** region generation seeds 2-3 side quests with leads, tied to local factions and NPCs. During play the AI may propose a new one from events; code accepts at most one new open side quest at a time, with a cap on the total.
-- **Readable content:** region generation also turns the code templates into local creatures and wares (names and descriptions only; numbers stay in the templates).
+- **Readable content:** how enemies, items and wares get their names and numbers depends on the content-table decision (open, see Decisions).
 - The opening scene is generated from the region and the character, replacing the fixed Rusted Ford start.
 
 ## Main quest as a milestone graph
@@ -351,6 +351,7 @@ Written down so it is not forgotten. Not part of v1 (scope freeze); build after 
 
 ## Open questions
 
+- Content tables: hand-written, AI-generated within code limits, or a mix (numbers by hand, flavor by AI)? Revisit at the start of each phase that needs a table (talents in 5, enemies, consumables and items in 6, prices in 8).
 - Which model for milestone graph generation? (Turns and summaries are decided, see Decisions.)
 - Pacing: how many turns per milestone, and how the game nudges when a milestone drags (Phase 7, with the threat clock).
 - Character creation: decided in depth at the start of Phase 5 (a pick-list of archetype, drive and flaw is one candidate).
