@@ -30,7 +30,7 @@ Background research on existing products and the evidence behind these decisions
 | Setting | Picked at game start |
 | Length | Main quest with an ending, tracked as a milestone graph. Finishing it ends the game. Side quests along the way. |
 | Combat | Abstract, round-based, resolved entirely by code. AI writes one in-universe summary at the end. |
-| Death | Permanent |
+| Death | Permanent, but 0 HP opens a defeat branch first (captured, left for dead or rescued, each with a real cost). Death when no branch fits or after a second fall soon after |
 | Option quality | Neutral: do not hint at risk or reward in option text |
 | Platform | Mobile-first PWA with a tiny backend that holds the API key and the save data |
 | Items | Text only, no pictures |
@@ -56,7 +56,7 @@ Background research on existing products and the evidence behind these decisions
 - Two-axis morality (alignment) that deeds shift and the world reacts to
 - Policy for off-path custom actions (consequences, not refusals)
 - Rules engine with XP, levels, equipment and loot, clamped difficulty, visible dice
-- Code-resolved combat with one AI summary, permanent death, flee/surrender, enemy morale, code enemy tables, item effects
+- Code-resolved combat with one AI summary, permanent death after a defeat branch, flee/surrender, enemy morale, code enemy tables, item effects
 - Text map with Travel, rest with random events
 - Memory: state, rolling summary, lore ledger
 - Backend: protected proxy with spend cap, JSON validation with retry, server-side saves with export/import, streaming narration
@@ -136,7 +136,8 @@ The Custom action button invites the AI to say yes to everything. Handle it expl
 - **Items do something:** a code table of consumable effects (heal, bonus, escape) for "use an item" in combat and outside it.
 - **Fair death:** a fight never starts without warning unless the player attacked; the scene shows the threat first. Every round offers flee or surrender (flee is a check with a cost; surrender leads to capture or a price, not death). Enemies check morale when they lose a member or half their strength and may flee or surrender. Location danger is shown (header and Travel list); option text stays neutral.
 - When combat ends, ONE AI call receives the structured combat log and writes an in-universe combat summary.
-- Death is permanent. If HP hits 0, the run ends with a short AI-written epilogue.
+- **Defeat branch at 0 HP:** you are down, not dead. Code picks what follows from the situation: captured (by enemies who take prisoners), left for dead, or rescued (by an NPC with a good attitude), each with a real cost such as lost gear, lost time, a threat clock tick or a lasting injury. The AI narrates the branch code picked.
+- Death is permanent. It happens when no branch fits (alone in the wilds, against enemies who take no prisoners) or when HP hits 0 again soon after a defeat. The run then ends with a short AI-written epilogue.
 
 ## Map and travel (text-based)
 
@@ -201,7 +202,7 @@ The AI has no memory. The app stores everything and rebuilds a compact prompt ev
 3. **Rules engine:** dice, HP, XP and levels, equipment, loot tables, difficulty clamps, visible dice, state persistence. Start with a small read-only Ledger view in the More sheet (entities and their facts, no AI call) so the memory can be checked while playing.
 4. **Retrieval and prompt assembly:** token budget per section, rolling summary, ledger retrieval, last-N turns, option variety, prompt caching of the static prefix, debug view of the assembled prompt.
 5. **Character:** character creation (content decided in depth at the start of the phase), the stat system and what each stat does, numbers and difficulty scale, level-ups and XP pace, three-result checks, morality axes (starting alignment, shifts, label), Character screen. Works through the "Character progression review" below. Comes before combat so combat is built on the final stats.
-6. **Combat:** code-resolved rounds, enemy tables, item effects, flee/surrender and morale, danger shown before fights and in the header, combat log, one AI summary call, permanent death and epilogue.
+6. **Combat:** code-resolved rounds, enemy tables, item effects, flee/surrender and morale, danger shown before fights and in the header, combat log, one AI summary call, defeat branch at 0 HP, permanent death and epilogue.
 7. **Quest structure:** milestone graph generation with 3 leads per milestone, threat clock with warning signs, day and time of day, NPC attitude and first-meeting reactions (shaped by alignment), quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
 8. **Map and polish:** text map and Travel (with danger and time), rest with random events, generic buttons, journal, Codex (known NPCs, places, factions, items with their facts; edit and delete), new game flow with the "never include" field, recap on return, streaming narration, export/import, home screen icon.
 9. **Tuning:** bot-played test runs of 100+ turns logging tokens per turn, contradictions against the ledger, option repetition and difficulty distribution. Try a cheaper model. Add regenerate-with-fixed-dice; tune the threat clock if the loop feels too safe.
@@ -241,6 +242,7 @@ Phase 3 shipped a first guess: 3 stats at +0..+2, +1 to the lowest stat per leve
 - Bot-play XP and level-ups to balance pace: XP per roll, XP per level, how many turns a level takes.
 - Revisit the max level (now 10) and what happens at the cap.
 - Show XP gained in one note per turn (roll XP and the AI's bonus XP are separate lines now, e.g. "+3 XP" then "+2 XP"). Small UI fix, fits Phase 5.
+- XP for finishing quests and milestones, not only for rolls (Ironsworn gives XP for completed vows). Decide the split between roll XP, AI bonus XP and quest XP.
 - Decide what each stat should actually do. Now: might, wits and grit only add to rolls, and combat (Phase 6) will need its own use for them.
 
 ## Later (not in v1)
@@ -253,6 +255,7 @@ Phase 3 shipped a first guess: 3 stats at +0..+2, +1 to the lowest stat per leve
 - Better model or higher effort for key scenes (milestones, finale)
 - Luck points: a small resource earned on failures, spent for +2 after seeing a roll (Ironsworn momentum style)
 - Supplies as a resource (only if the threat clock is not enough pressure)
+- Faction clocks: factions pursue their own plans, each with a small clock code advances over time (Blades in the Dark)
 - Mythic-style Chaos Factor and scene-check twists for random events
 - Oracle button (yes/no questions with odds, resolved by code)
 - Legacy between runs

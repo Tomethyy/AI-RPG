@@ -123,7 +123,7 @@ Established techniques from human-run and solo games that address problems this 
 
 Priority: **Foundation** means v1 would feel broken or be unsafe without it. **Should** means clearly valuable. **Later** is optional.
 
-Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later. Q-AD came from the review after Phase 4; their status shows what was accepted. Character creation got its own phase (5) before combat.
+Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later. Q-AF came from the review after Phase 4; their status shows what was accepted. Character creation got its own phase (5) before combat.
 
 | # | Gap | Why it matters (evidence) | Fix | Priority | Status in PLAN.md |
 |---|---|---|---|---|---|
@@ -144,7 +144,7 @@ Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under 
 | O | Oracle questions | Standard solo-RPG tool | Yes/no button with odds, resolved by code | Later | Later |
 | P | Companions, drawn map, item art, legacy | Already deferred | Keep deferred | Later | Later |
 | Q | Checks are binary pass/fail | PbtA and Ironsworn three-band results; fail forward | Cost band just under the difficulty, plus natural 1/20 | Should, before Phase 5 | Accepted, Phase 5 (Character) |
-| R | No escape from a lethal fight | Roguelike fairness; OSR morale | Flee/surrender choice in every fight, enemy morale, defeat branch at 0 HP | Foundation for permadeath | Accepted, Phase 6 |
+| R | No escape from a lethal fight | Roguelike fairness; OSR morale | Flee/surrender choice in every fight, enemy morale, defeat branch at 0 HP | Foundation for permadeath | Accepted, Phase 6 (defeat branch included) |
 | S | Danger is not telegraphed | Roguelike fairness ("enough information to decide") | Scene shows the threat before a fight; location danger visible | Should | Accepted, Phase 6 (location danger shown too) |
 | T | Enemy numbers have no source | Same rule as loot: code owns numbers | Enemy stat tables by tier and danger; AI names and describes only | Foundation | Accepted, Phase 6 |
 | U | Consumables do nothing | Combat plan allows "use an item" | Code table of item effects (heal, bonus, escape) | Foundation | Accepted, Phase 6 |
@@ -155,6 +155,8 @@ Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under 
 | Z | The player has no say over luck | Ironsworn momentum, Fate points | Small luck resource: earned on failures, spent for +2 after a roll | Later or Should | Later |
 | AA | Coming back after days is disorienting | "Previously on" recap | Recap screen from the stored summary, no AI call | Should | Accepted, Phase 8 |
 | AB | No content boundaries | Session zero, lines and veils | "Never include" field at New game, in the cached prefix | Should | Accepted, Phase 8 |
+| AE | XP only for rolls | Ironsworn XP for completed vows | XP for finishing quests and milestones | Should | Phase 5 progression review |
+| AF | Factions are static | Blades in the Dark faction clocks | Small clocks per faction, advanced by code | Later | Later |
 | AD | No sense of who the character has become | D&D alignment; morality meter research | Two hidden axes, label on change, world reacts, nothing locked | Should | Accepted, Phase 5 (axes) and Phase 7 (reactions) |
 | AC | Plan items with no phase | Everweave latency complaints | Streaming narration; better model for milestone and finale turns | Should | Streaming: Phase 8. Key-scene model: Later |
 
