@@ -111,6 +111,8 @@ async function handleTurn(request, env, ctx) {
 
   const fallback = async (reason, detail) => {
     save.counters.fallbacks++;
+    // Keep the last few reasons: the phone shows the note only once, so More → Prompt is where they can be looked up later.
+    save.fallback_log = [...(save.fallback_log || []), { ts: new Date().toISOString(), turn: save.turn, reason, detail: detail ? String(detail).slice(0, 300) : undefined }].slice(-5);
     await storeSave(env, save);
     const f = fallbackTurn(save, reason);
     console.log(JSON.stringify({ event: "fallback", reason, detail, turn: save.turn }));
@@ -201,6 +203,7 @@ async function handlePrompt(env) {
       last_cost: sum?.cost, last_model: sum?.model, error: sum?.error,
     },
     counters: save.counters,
+    fallbacks: save.fallback_log || [],
   });
 }
 

@@ -48,7 +48,7 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.18"; // stamped by stamp.py
+const JS_BUILD = "1.19"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Look", "Talk", "Travel", "Rest"];
 const MORE = ["Ledger", "Prompt", "Inventory", "Wildcard", "Custom action"];
@@ -409,6 +409,10 @@ async function openPrompt() {
     const c = d.counters;
     const kinds = Object.entries(c.kinds || {}).map(([k, n]) => `${k} ${n}`).join(", ") || "none yet";
     body.append(ledgerLine("Counters", `AI turns ${c.ai_turns}, fallbacks ${c.fallbacks}, retries ${c.retries}, merges ${c.merges}, repeats dropped ${c.options_dropped}, low-variety turns ${c.variety_low} · option kinds: ${kinds}`));
+    for (const f of (d.fallbacks || []).slice().reverse()) {
+      const when = new Date(f.ts).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+      body.append(ledgerLine(`Fallback · turn ${f.turn} · ${when}`, `${REASONS[f.reason] || f.reason}${f.detail ? ": " + f.detail : ""}`));
+    }
     for (const sec of d.sections) {
       const box = el("details", "prompt-sec");
       const over = sec.budget && sec.tokens > sec.budget;

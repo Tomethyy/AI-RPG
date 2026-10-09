@@ -14,6 +14,7 @@
 //                                 (written in the background by a cheap model into "sum:<game id>", adopted on the next request)
 //   recent: [TurnRecord],         turns not yet summarized plus the newest RECENT_PROMPT, at most RECENT_KEEP
 //   last: { request_id, response } | null,           idempotency: a repeated request gets the stored reply
+//   fallback_log: [{ ts, turn, reason, detail }],    last 5 fallback turns (optional; created on the first fallback)
 //   counters: { ai_turns, fallbacks, retries, dc{final difficulty: count}, dc_clamped,
 //               summaries, merges, options_dropped (repeats removed), variety_low (turns with < 3 option kinds), kinds{kind: count} },
 // }
