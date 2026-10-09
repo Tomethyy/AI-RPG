@@ -56,6 +56,51 @@ Background for `PLAN.md`. Read only when a design question needs evidence. The d
 - **Developer reports:** a general chat model was unreliable at tracking health and buffs, so one developer moved state into an external database and used the LLM only for narration. Another noted LLM consistency is a systems problem, so the model must sit inside a system that enforces the world state. Another reported separating game logic from narration and tracking player state outside the model.
 - **Take-away:** this is the strongest evidence for our architecture (external state, structured output, code-owned rules) and it supplies two things we lacked: a milestone graph for the main quest and a policy for unreasonable player actions.
 
+### Newer AI RPG apps (2026)
+- Auferet (browser AI GM, persistent memory of characters, places and events, 10 free actions a day), Eidolon Engine and Jenova's Roleplay Game Master all market "persistent" or "unlimited" memory. All are vendor claims with no independent tests. A neutral 2026 roundup (Converge) still calls consistency the genre's core engineering challenge.
+- PAYADOR (arXiv 2504.07304, 2025) reports that LLM game masters struggle to keep the narrated world coherent after changes, with an AI Dungeon example of inventory being contradicted. A 2026 neuro-symbolic storytelling paper (arXiv 2605.24719) has the LLM propose actions that are executed against a structured world state, the same split we use.
+- **Take-away:** nothing new changes the architecture. Memory is still what everyone sells and nobody has proven.
+
+## Standard practices from tabletop and solo RPG design
+
+Established techniques from human-run and solo games that address problems this project has. They are design practice, not studies, so the evidence is decades of play rather than measurement.
+
+### Degrees of success and "fail forward" (Powered by the Apocalypse, Ironsworn)
+- PbtA games roll 2d6: 10+ full success, 7-9 success at a cost or a lesser version of the goal, 6- a miss that still moves the story. Ironsworn has the same three bands (strong hit, weak hit, miss). The middle band is where "fail forward" lives: failure is never "nothing happens".
+- The hard part is the middle result. The common advice is that a 7-9 does not cancel the success; it adds a cost, a complication or a smaller gain.
+- **For us:** our d20 check is binary. A cost band just under the difficulty (e.g. 1-2 below) gives the AI a third, well-defined result, makes the game less swingy under permanent death, and needs no extra AI call. It touches the rules engine, the dice display and the prompt, and combat will reuse the same resolution, so it is cheapest to add before Phase 5.
+
+### Progress clocks and fronts (Blades in the Dark, Dungeon World)
+- A clock is a circle of 4, 6 or 8 segments that tracks a complex obstacle or a growing threat. Danger clocks tick on complications (1-3 segments by severity) and trigger the danger when full. Faction clocks advance a group's plans on their own, independently of the player.
+- Dungeon World fronts: each danger has an impending doom (what happens if the heroes do nothing) and 1-5 grim portents, the visible warning signs that move it closer. Player action can divert it.
+- **For us:** this is the standard answer to the open pressure question (gap K). A threat clock on the main quest, with portents generated together with the milestone graph, is pure data that code ticks (on failures, rests, travel, time), and the narration shows each portent. It gives pacing and stakes without trusting the AI to create urgency.
+
+### Solo play toolkit (Ironsworn, Mythic)
+- Ironsworn is built for solo play: vows (sworn quests, ranked by difficulty) with progress tracks; momentum, a resource that successes build and failures drain, spendable to turn a failure into a success; supply, a shared resource track instead of item-by-item rations; oracles (random tables) for twists and names. XP comes from completing vows.
+- **For us:** vows match our quest focus. Momentum is the standard way to give a solo player some control over luck, which matters more with permanent death and dice fixed per turn. Supply is a lighter alternative to tracking every ration. XP for completing quests (not only for rolls) is the genre norm.
+
+### The Three Clue Rule and node-based scenarios (The Alexandrian)
+- For any conclusion the player must reach, include at least three clues, because players miss or misread clues. Inverted: a player with any three leads reaches at least one destination, so a scenario can branch without a fixed path. Nodes can be whole scenarios in a campaign.
+- **For us:** a milestone whose condition the AI never makes reachable stalls the game. Generating 3 leads per milestone with the graph (Phase 6) and putting the unrevealed ones in the prompt keeps the main quest moving. Leads can point to locations and NPCs, which also feeds the side-quest surfacing rule.
+
+### Morale, reactions and escape (OSR / B/X)
+- Classic morale: when a side loses its first member or half its strength, roll 2d6 against a morale score (2 = never fights, 12 = to the death); on a failed check the enemies flee, withdraw or surrender. Reaction rolls (2d6, hostile to friendly) decide how a newly met creature or NPC behaves before anyone draws steel.
+- **For us:** fights that end in flight or surrender are shorter (cheaper to resolve and to narrate) and less lethal. A first-meeting reaction is a code-owned roll the AI must honor, the same pattern as our dice.
+
+### Fair permanent death (roguelike design)
+- Roguelike designers agree a death should trace back to a decision the player could have read: give enough information to decide, make randomness create hard situations, not unwinnable ones, and keep escape routes visible. Some games turn 0 HP into a "defeat branch" (escape, capture, treatment) and end the run only if none is available or the player picks a self-destructive option.
+- **For us:** "option text stays neutral" is fine, but the scene must still telegraph danger before a fight, every fight needs a flee or surrender choice, and code should guarantee that combat never starts with no warning unless the player chose to attack.
+
+### NPC attitude and the passage of time (CRPG practice, recent AI work)
+- CRPGs track NPC disposition as a number and let it gate options and prices. A 2026 survey of agent systems and the NarrativeWorlds thesis (HKUST, 2026) both name relationship state as explicit memory that keeps long stories coherent.
+- No source covers time-of-day tracking specifically, but in our own play the AI already makes time claims ("burned four nights ago", "until the month turns"). Without a code-owned day counter these will drift and contradict each other.
+- **For us:** a small code-owned attitude per NPC (-2..+2, changed by at most 1 per turn, shifting social difficulty) and a code-owned clock (day number plus time of day, advanced by travel and rest) are cheap state that the prompt can show every turn.
+
+### Table practices
+- Session zero and safety tools (lines: never include; veils: happens off-screen) are standard at the start of a campaign. For a solo AI game this is a "never include" field at New game, stored with the setting (it lives in the cached prefix, so it costs nothing per turn).
+- A "previously on" recap at the start of a session is standard GM practice and helps a phone player who returns after days. We already store the rolling summary, so it needs no AI call.
+- Character creation in most modern games is a short list of choices (archetype or background, one drive or bond, one flaw) that the game then fleshes out. This answers the open question about templates vs AI generation: the player picks, the AI writes.
+
 ## What the research says about the plan
 
 **Supported by evidence:**
@@ -72,7 +117,7 @@ Background for `PLAN.md`. Read only when a design question needs evidence. The d
 
 Priority: **Foundation** means v1 would feel broken or be unsafe without it. **Should** means clearly valuable. **Later** is optional.
 
-Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later.
+Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later. Q-AC came from the review after Phase 4 and stay proposals until decided.
 
 | # | Gap | Why it matters (evidence) | Fix | Priority | Status in PLAN.md |
 |---|---|---|---|---|---|
@@ -84,14 +129,27 @@ Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under 
 | F | No failure handling | Everweave reviews complain about slowness and breakage. | Validation and retry, safe fallback turn, streaming, idempotent turns | Foundation | v1, Phase 2 |
 | G | Save data can be lost | Permadeath plus a lost save is the worst case. | Server-side saves plus export/import | Foundation | v1, Phase 2 |
 | H | Retry/undo without reroll cheating | Undo and retry are AI Dungeon's most-used features. | Regenerate text, keep dice fixed per turn | Should | Phase 8 |
-| I | Player cannot see or fix what the AI believes | Editable context is how AI Dungeon players fix drift. | Codex screen, prompt debug view | Should | Phase 4 (debug), Phase 8 (Codex) |
-| J | Option repetition and sameness | AI Dungeon repetition loops, ChatRPG restating replies | Send recent option sets, forbid repeats, require variety | Should | Phase 4 |
+| I | Player cannot see or fix what the AI believes | Editable context is how AI Dungeon players fix drift. | Codex screen, prompt debug view | Should | Debug view done (Phase 4); Codex in Phase 7 |
+| J | Option repetition and sameness | AI Dungeon repetition loops, ChatRPG restating replies | Send recent option sets, forbid repeats, require variety | Should | Done (Phase 4, soft filter plus counters) |
 | K | No pressure on the player | Stakes come from scarcity. | Day counter and supplies, or a threat clock | Should | Open question |
-| L | Dice are invisible | Players need to see fairness, especially with permadeath | Show roll, modifier, difficulty and result | Should | v1, Phase 3 |
+| L | Dice are invisible | Players need to see fairness, especially with permadeath | Show roll, modifier, difficulty and result | Should | Done (Phase 3) |
 | M | No way to test consistency and cost | Successful developers studied logs for contradictions and balance bugs | Bot-played 100+ turn test runs with logging | Should | Phase 8 |
 | N | Weak random events | Mythic's Chaos Factor produces surprise and pacing | Chaos Factor and scene-check twists | Later | Later |
 | O | Oracle questions | Standard solo-RPG tool | Yes/no button with odds, resolved by code | Later | Later |
 | P | Companions, drawn map, item art, legacy | Already deferred | Keep deferred | Later | Later |
+| Q | Checks are binary pass/fail | PbtA and Ironsworn three-band results; fail forward | Cost band just under the difficulty, plus natural 1/20 | Should, before Phase 5 | Proposed |
+| R | No escape from a lethal fight | Roguelike fairness; OSR morale | Flee/surrender choice in every fight, enemy morale, defeat branch at 0 HP | Foundation for permadeath | Proposed (Phase 5) |
+| S | Danger is not telegraphed | Roguelike fairness ("enough information to decide") | Scene shows the threat before a fight; location danger visible | Should | Proposed (Phase 5) |
+| T | Enemy numbers have no source | Same rule as loot: code owns numbers | Enemy stat tables by tier and danger; AI names and describes only | Foundation | Proposed (Phase 5) |
+| U | Consumables do nothing | Combat plan allows "use an item" | Code table of item effects (heal, bonus, escape) | Foundation | Proposed (Phase 5) |
+| V | A milestone can stall | Three Clue Rule | 3 leads per milestone, unrevealed ones in the prompt | Should | Proposed (Phase 6) |
+| W | Time is not tracked, the AI invents dates | Observed in play; fronts and clocks need time | Code-owned day and time of day, advanced by travel and rest | Should | Proposed (Phase 6) |
+| X | Pressure (gap K) | Blades clocks, Dungeon World fronts, Ironsworn supply | Threat clock with portents on the main quest; supply optional | Should | Proposed (Phase 6) |
+| Y | NPC attitude lives only in prose facts | CRPG disposition; OSR reaction rolls; NarrativeWorlds | Attitude -2..+2 per NPC, code-clamped, first-meeting reaction roll | Should | Proposed |
+| Z | The player has no say over luck | Ironsworn momentum, Fate points | Small luck resource: earned on failures, spent for +2 after a roll | Later or Should | Proposed |
+| AA | Coming back after days is disorienting | "Previously on" recap | Recap screen from the stored summary, no AI call | Should | Proposed (Phase 7) |
+| AB | No content boundaries | Session zero, lines and veils | "Never include" field at New game, in the cached prefix | Should | Proposed (Phase 7) |
+| AC | Plan items with no phase | Everweave latency complaints | Streaming narration; better model for milestone and finale turns | Should | Proposed (assign a phase) |
 
 Biggest hole was A. "Main quest with an ending" is a promise the AI cannot keep on its own.
 
@@ -108,3 +166,12 @@ Biggest hole was A. "Main quest with an ending" is a promise the AI cannot keep 
 - Song et al., "You Have Thirteen Hours in Which to Solve the Labyrinth: Enhancing AI Game Masters with Function Calling" (arxiv.org/abs/2409.06949)
 - OpenAI community developer threads on AI dungeon masters and RPG state tracking
 - Respan, "NPC dialogue consistency" (engineering article on LLM game NPC failure modes)
+- PbtA partial success: Gnome Stew, "Failing forward" (gnomestew.com/failing-forward-how-to-make-failure-interesting-in-rpgs); "Conquering the dreaded 7-9" (viridianvoid.bearblog.dev); StartPlaying, "What is Powered by the Apocalypse"
+- Blades in the Dark progress clocks: Roll20 compendium (roll20.net/compendium/BITD/Progress clocks); Sly Flourish, "Progress clocks in D&D"; The Alexandrian on Blades
+- Ironsworn: Wikipedia; Gnome Stew review; Quest Portal, "Tools for the Lone Oathkeeper" and "What is Ironsworn?"; ironswornrpg.com
+- The Alexandrian, "The Three Clue Rule" (thealexandrian.net/?p=7985) and "Node-Based Scenario Design, Part 2" (thealexandrian.net/creations/misc/node-design/node-design2.html)
+- Dungeon World fronts: Roll20 compendium (roll20.net/compendium/dw/Fronts); Sly Flourish, "Fronts in D&D"
+- OSR morale and reactions: DMDavid, "Morale checks"; The Alexandrian on reactions; referee screen notes (git.itsericwoodward.com)
+- Roguelike permadeath: Game Developer, "The game design lessons of permadeath"; r/roguelikedev FAQ Friday #19 (Cogmind); Bugnet, "How to make a roguelike feel fair"; Blade RPG, "One life"
+- PAYADOR (arxiv.org/abs/2504.07304); "World-State Transformations for Neuro-symbolic Interactive Storytelling" (arXiv 2605.24719); "AI Agent Systems" survey (arXiv 2601.01743); Kumyol, "NarrativeWorlds" (HKUST, 2026)
+- 2026 apps: Auferet (peerpush.com/p/auferet, toolradar.com), Eidolon Engine (Gumroad listing), Jenova articles (vendor), Converge, "Best AI text adventure games 2026"
