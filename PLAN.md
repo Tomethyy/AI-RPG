@@ -301,6 +301,20 @@ Phase 3 shipped a first guess: 3 stats at +0..+2, +1 to the lowest stat per leve
 
 ## Later (not in v1)
 
+### v2: Mythic paths (inspired by Pathfinder: Wrath of the Righteous)
+
+Written down so it is not forgotten. Not part of v1 (scope freeze); build after Phase 9. It needs v1's alignment, talents, milestone graph and epilogue builder.
+
+**What WotR does:** a mythic rank separate from character level, earned from main-quest milestones, not XP (rank 1-2 are a generic "mythic hero"). At rank 3 the player picks a path among those unlocked: Angel, Demon, Lich, Aeon, Azata, Trickster, or Legend (stay mortal). Paths unlock through earlier deeds and dialogue choices, and a path not unlocked by then is gone. Each path has a core alignment you may stray from by one step; further, and a path quest pulls you back. Late paths (Gold Dragon, Swarm-That-Walks, Devil) open around rank 8. Each path changes powers, how the world treats you, companions' reactions and the ending.
+
+**How it fits our game:**
+- **Mythic rank** from milestones (about one rank per 2 milestones, so 4-5 ranks in a 150-250 turn game), separate from level.
+- **Path catalog in code**, as archetypes with a core alignment, a theme, unlock signs, talents and an ending: e.g. Saint/Angel (lawful good, sacrifice), Fiend/Demon (chaotic evil, rage and ruin), Undying/Lich (lawful or neutral evil, bargains with death, forbidden lore), Arbiter/Aeon (lawful neutral, judgment and balance), Free spirit/Azata (chaotic good, freedom and art), Trickster (chaotic neutral, deception and luck), Legend (mortal: extra levels and talents instead). The AI renames and flavors them for the chosen setting at game start; in a low-magic setting they are quieter (a feared saint, a revenant, an outlaw legend) rather than wings and fire.
+- **Unlocking:** each path has a hidden affinity counter. Code moves it from the same signals as alignment plus path-specific tagged deeds the AI proposes with a reason ("spared the deserter: Saint +1"), capped per turn like every other proposal. A path unlocks at a threshold and shows up as an in-world sign or offer, never as a meter.
+- **The choice** comes at a telegraphed milestone (like WotR's rank 3) among the unlocked paths; Legend is always available. Unlike WotR, a path missed early can still be reached later through a path quest, so there is no permanent lockout (the most common WotR complaint).
+- **Effects:** path talents with code-defined effects; NPC first reactions, attitude and fear shift with the path (a lich is not welcome at the shrine); the narrator voice changes; straying more than one alignment step from the path's core starts a path quest; the path decides which branch of the branching finale is open and gets its own epilogue.
+- **Cost per turn:** about 30 more prompt tokens (rank, path and one line of path voice) and one more proposal kind in state_changes; affinity, rank and unlocks are code state. Flat cost holds.
+
 - **Companions:** each needs a ledger record, stats, combat participation and an AI voice, so more context per turn and more rules. Design the memory schema so it does not block them, but do not build them first.
 - Full camp scene with its own options
 - Drawn map
