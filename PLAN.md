@@ -7,7 +7,7 @@ Background research on existing products and the evidence behind these decisions
 ## Status
 
 - **Done:** Phases 1-4 (skeleton, backend and schema, rules engine, retrieval and prompt assembly), verified on the phone. Phase 5 (Character) is built, tested (39 tests, including a 30-turn end-to-end run against the mock) and deployed; it waits for the phone checklist to be ticked.
-- **Next:** Phase 6 Combat (Sonnet, High), after the Phase 5 phone checklist and the next playtest notes.
+- **Next:** Phase 6 Combat (Sonnet, High), after the Phase 5 phone checklist and the next playtest notes. Decision after the Phase 5 playtest: no interim story seed; continuity is fixed structurally by Phase 7 (see the top design principle). Open question for the next go: do Phase 7 before Phase 6, since continuity is the top principle and combat does not depend on it.
 - **Cost baseline (after Phase 4, measured on the phone):** about 4.4k input tokens a turn (half from cache), about 680 output tokens, about $0.012 a turn.
 - **Cost after Phase 5 (measured on the phone, turn 11):** input 2,698 + cache read 3,572 + cache write 705 (about 7.0k in all; the Prompt view's estimate was 4.4k, a real/estimated ratio of 1.57), 555 output, $0.0134 a turn (the estimate before building was about $0.013). Flat as the campaign grows. A turn after a pause of over 5 minutes re-writes the cache.
 - **Free-plan limits (30-turn end-to-end run):** save 19 KB (the verbatim window and the fact cap bound it; expect 60-120 KB at 250 turns); 3.6 KV writes a turn (about 275 turns a day against the 1,000-write limit); pure compute about 1 ms a turn against 10 ms CPU.
