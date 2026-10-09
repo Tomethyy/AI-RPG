@@ -13,7 +13,7 @@ Background research on existing products and the evidence behind these decisions
   - Fallbacks: 3 in the first 6 turns of the current game, cause unknown (the last 5 are now logged in More → Prompt). Check whether they recur.
   - The Prompt view's token estimate counts only prompt text; real input is about twice as high because the JSON schema and request overhead are not counted.
   - XP shows as two notes per turn (roll XP and bonus XP). Fix in Phase 5.
-  - Every new game still starts from the hand-built Rusted Ford template (replaced by character creation in Phase 5 and the New game flow in Phase 8).
+  - Every new game still starts from the hand-built Rusted Ford template, and there is no background lore: names and lore are improvised turn by turn (recorded in the ledger). Fixed by the world core (Phase 5), region generation (Phase 7) and the New game flow (Phase 8).
 
 **Working rules for Claude Code:**
 - Build one phase at a time, starting with Phase 1. Ask me about any open question that blocks the current phase. Do not build ahead.
@@ -48,6 +48,7 @@ Background research on existing products and the evidence behind these decisions
 | Topic | Decision |
 |---|---|
 | Setting | v1 has one fixed world: classic medieval fantasy with low magic. Humans dominate; magic is real but rare, costly and distrusted; monsters live at the edges (wolves, bandits, the odd troll or ghost), in the spirit of The Witcher or Dragon Age. Choosing other settings (cyberpunk, pirates, ...) is v2 |
+| World and lore | Two layers. A hand-written **world core**, fixed for v1 and cached in the prompt (~500 tokens, near zero cost per turn): the realm and its regions, a short history, how magic works and why it is distrusted, the main religion, 3-4 major powers, which monsters exist. Plus a **region generated once per New game** inside that world: starting area, 6-8 places, 3-4 local factions with goals, key NPCs, the central conflict, with the milestone graph and threat clock built on it, stored in the ledger. Every run gets new names and a new story in the same world |
 | Length | Main quest with an ending, tracked as a milestone graph. Finishing it ends the game. Side quests along the way. One game is about 150-250 turns (a few weeks of short sessions), 8-10 milestones, reaching about level 6-8 by the finale |
 | Combat | Abstract, round-based, resolved entirely by code. AI writes one in-universe summary at the end. |
 | Death | Permanent, but 0 HP opens a defeat branch first (captured, left for dead or rescued, each with a real cost). Death when no branch fits or after a second fall soon after |
@@ -78,6 +79,7 @@ Done (Phases 1-4): story loop and options, rules engine (dice, HP, XP, gear, loo
 
 | Item | Phase |
 |---|---|
+| World core (hand-written lore, cached) | 5 |
 | Character creation, revisited stat system, XP pace for a ~150-250 turn game | 5 |
 | Three-result checks, difficulty not tied to level, no retry without change | 5 |
 | Narrator rules (never act or speak for the character, NPCs can refuse and lie, callbacks) | 5 |
@@ -89,6 +91,7 @@ Done (Phases 1-4): story loop and options, rules engine (dice, HP, XP, gear, loo
 | Fair death: flee/surrender, morale, danger shown first, enemy intent shown, defeat branch, permanent death | 6 |
 | Enemy roles and status effects | 6 |
 | Unique items with properties or drawbacks | 6 |
+| Region generated per game (places, factions, NPCs, conflict) with the milestone graph | 7 |
 | Milestone graph with 3 leads per milestone, quest flags, quest focus, side quests | 7 |
 | Threat clock with warning signs, code-owned day and time of day | 7 |
 | Custom action classification and consequence-based responses | 7 |
@@ -125,6 +128,12 @@ If the loop is not fun at this size, extras will not fix it. (Most rows came fro
 ## Generic buttons (hardcoded, no AI cost)
 
 Look around, Talk to someone, Travel, Rest, Check inventory, Wildcard (random event table), Custom action (free text escape hatch).
+
+## World core and generated region
+
+- **World core (Phase 5):** written once (Claude drafts, I approve), stored in the code as static text in the cached prompt prefix. The AI must never contradict it; it is the frame for everything the AI invents. It also anchors the v2 mythic paths (angels need a heaven, liches need death magic).
+- **Region generation (Phase 7, called by New game in Phase 8):** one larger AI call at game start returns structured data, validated by code like a turn: places with connections (code rolls their danger), local factions with goals, 4-6 key NPCs with profiles, the central conflict, and the milestone graph with leads, branching finale and threat clock. Everything goes into the ledger before turn 1, so retrieval finds it from the start. Cost about $0.05-0.10 once per game.
+- The opening scene is generated from the region and the character, replacing the fixed Rusted Ford start.
 
 ## Main quest as a milestone graph
 
@@ -255,9 +264,9 @@ Every phase that adds a section must fit it into the budget (rebalancing the oth
 2. **Backend and schema:** protected proxy (Cloudflare Worker or Vercel function), spend cap, server-side save, memory schema (state, summary, ledger, milestone graph). One real AI turn, JSON validation with retry, the turn writes to the ledger.
 3. **Rules engine:** dice, HP, XP and levels, equipment, loot tables, difficulty clamps, visible dice, state persistence. Start with a small read-only Ledger view in the More sheet (entities and their facts, no AI call) so the memory can be checked while playing.
 4. **Retrieval and prompt assembly:** token budget per section, rolling summary, ledger retrieval, last-N turns, option variety, prompt caching of the static prefix, debug view of the assembled prompt.
-5. **Character:** character creation (content decided in depth at the start of the phase), the stat system and what each stat does, numbers and difficulty scale, level-ups and XP pace, three-result checks, advantage/disadvantage, talents, difficulty no longer tied to level, no retry without change, narrator rules, morality axes (starting alignment, shifts, label), item slots, Character screen. Works through the "Character progression review" below, with XP pace sized for a 150-250 turn game. Housekeeping first: replace the old "gritty, almost no magic" world text in the starting template with the v1 world, split `app.js` into a few plain files (no build step), add the automated end-to-end test (a 30-turn run of the Worker against the mock) to `npm test`, and add the keep-a-copy-before-migrating step for saves. Comes before combat so combat is built on the final stats.
+5. **Character:** character creation (content decided in depth at the start of the phase), the stat system and what each stat does, numbers and difficulty scale, level-ups and XP pace, three-result checks, advantage/disadvantage, talents, difficulty no longer tied to level, no retry without change, narrator rules, morality axes (starting alignment, shifts, label), item slots, Character screen. Works through the "Character progression review" below, with XP pace sized for a 150-250 turn game. Housekeeping first: write the world core (Claude drafts, I approve) and replace the old "gritty, almost no magic" world text with it, split `app.js` into a few plain files (no build step), add the automated end-to-end test (a 30-turn run of the Worker against the mock) to `npm test`, and add the keep-a-copy-before-migrating step for saves. Comes before combat so combat is built on the final stats.
 6. **Combat:** (the defeat branch's "rescued by a friendly NPC" and threat-clock costs are hooked up in Phase 7, once NPC attitude and the clock exist) code-resolved rounds, enemy tables with roles and visible intent, status effects, item effects, unique items, item prices (designed with gear), flee/surrender and morale, danger shown before fights and in the header, combat log, one AI summary call, defeat branch at 0 HP, permanent death and epilogue.
-7. **Quest structure:** milestone graph generation with 3 leads per milestone, threat clock with warning signs, day and time of day, NPC attitude and first-meeting reactions (shaped by alignment), NPC profiles, branching finale, epilogue built from choices, quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
+7. **Quest structure:** region generation at game start (places, factions, key NPCs, conflict) inside the world core, milestone graph generation with 3 leads per milestone, threat clock with warning signs, day and time of day, NPC attitude and first-meeting reactions (shaped by alignment), NPC profiles, branching finale, epilogue built from choices, quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
 8. **Map and polish:** text map and Travel (with danger and time), rest with random events, generic buttons, journal, Codex (known NPCs, places, factions, items with their facts; edit and delete), new game flow (no setting choice in v1) with the "never include" field and difficulty setting, merchants and shops, location secrets, hall of fallen heroes, text size setting and first-time tips, recap on return, streaming narration, export/import, home screen icon.
 9. **Tuning:** bot-played test runs of 100+ turns logging tokens per turn, contradictions against the ledger, option repetition and difficulty distribution. Try a cheaper model. Add regenerate-with-fixed-dice; tune the threat clock if the loop feels too safe.
 
