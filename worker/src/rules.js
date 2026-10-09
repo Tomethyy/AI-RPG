@@ -183,7 +183,7 @@ function removeItem(actor, name, qty) {
   return "not_found";
 }
 
-// Keep an actor above 0 until Phase 5 adds combat and permanent death.
+// Keep an actor above 0 until Phase 6 adds combat and permanent death.
 export function settleWounded(actor) {
   const wounded = actor.conditions.includes(WOUNDED);
   if (actor.hp <= 1 && !wounded) actor.conditions.push(WOUNDED);

@@ -117,7 +117,7 @@ Established techniques from human-run and solo games that address problems this 
 
 Priority: **Foundation** means v1 would feel broken or be unsafe without it. **Should** means clearly valuable. **Later** is optional.
 
-Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later. Q-AC came from the review after Phase 4 and stay proposals until decided.
+Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later. Q-AC came from the review after Phase 4; their status shows what was accepted. Character creation got its own phase (5) before combat.
 
 | # | Gap | Why it matters (evidence) | Fix | Priority | Status in PLAN.md |
 |---|---|---|---|---|---|
@@ -128,28 +128,28 @@ Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under 
 | E | Proxy unprotected and uncapped | The key is the only secret. | Shared secret, spend cap, size limit, model tiering | Foundation | v1, Phase 2 |
 | F | No failure handling | Everweave reviews complain about slowness and breakage. | Validation and retry, safe fallback turn, streaming, idempotent turns | Foundation | v1, Phase 2 |
 | G | Save data can be lost | Permadeath plus a lost save is the worst case. | Server-side saves plus export/import | Foundation | v1, Phase 2 |
-| H | Retry/undo without reroll cheating | Undo and retry are AI Dungeon's most-used features. | Regenerate text, keep dice fixed per turn | Should | Phase 8 |
+| H | Retry/undo without reroll cheating | Undo and retry are AI Dungeon's most-used features. | Regenerate text, keep dice fixed per turn | Should | Phase 9 |
 | I | Player cannot see or fix what the AI believes | Editable context is how AI Dungeon players fix drift. | Codex screen, prompt debug view | Should | Debug view done (Phase 4); Codex in Phase 7 |
 | J | Option repetition and sameness | AI Dungeon repetition loops, ChatRPG restating replies | Send recent option sets, forbid repeats, require variety | Should | Done (Phase 4, soft filter plus counters) |
-| K | No pressure on the player | Stakes come from scarcity. | Day counter and supplies, or a threat clock | Should | Open question |
+| K | No pressure on the player | Stakes come from scarcity. | Day counter and supplies, or a threat clock | Should | Decided: threat clock + day, Phase 7 |
 | L | Dice are invisible | Players need to see fairness, especially with permadeath | Show roll, modifier, difficulty and result | Should | Done (Phase 3) |
-| M | No way to test consistency and cost | Successful developers studied logs for contradictions and balance bugs | Bot-played 100+ turn test runs with logging | Should | Phase 8 |
+| M | No way to test consistency and cost | Successful developers studied logs for contradictions and balance bugs | Bot-played 100+ turn test runs with logging | Should | Phase 9 |
 | N | Weak random events | Mythic's Chaos Factor produces surprise and pacing | Chaos Factor and scene-check twists | Later | Later |
 | O | Oracle questions | Standard solo-RPG tool | Yes/no button with odds, resolved by code | Later | Later |
 | P | Companions, drawn map, item art, legacy | Already deferred | Keep deferred | Later | Later |
-| Q | Checks are binary pass/fail | PbtA and Ironsworn three-band results; fail forward | Cost band just under the difficulty, plus natural 1/20 | Should, before Phase 5 | Proposed |
-| R | No escape from a lethal fight | Roguelike fairness; OSR morale | Flee/surrender choice in every fight, enemy morale, defeat branch at 0 HP | Foundation for permadeath | Proposed (Phase 5) |
-| S | Danger is not telegraphed | Roguelike fairness ("enough information to decide") | Scene shows the threat before a fight; location danger visible | Should | Proposed (Phase 5) |
-| T | Enemy numbers have no source | Same rule as loot: code owns numbers | Enemy stat tables by tier and danger; AI names and describes only | Foundation | Proposed (Phase 5) |
-| U | Consumables do nothing | Combat plan allows "use an item" | Code table of item effects (heal, bonus, escape) | Foundation | Proposed (Phase 5) |
-| V | A milestone can stall | Three Clue Rule | 3 leads per milestone, unrevealed ones in the prompt | Should | Proposed (Phase 6) |
-| W | Time is not tracked, the AI invents dates | Observed in play; fronts and clocks need time | Code-owned day and time of day, advanced by travel and rest | Should | Proposed (Phase 6) |
-| X | Pressure (gap K) | Blades clocks, Dungeon World fronts, Ironsworn supply | Threat clock with portents on the main quest; supply optional | Should | Proposed (Phase 6) |
-| Y | NPC attitude lives only in prose facts | CRPG disposition; OSR reaction rolls; NarrativeWorlds | Attitude -2..+2 per NPC, code-clamped, first-meeting reaction roll | Should | Proposed |
-| Z | The player has no say over luck | Ironsworn momentum, Fate points | Small luck resource: earned on failures, spent for +2 after a roll | Later or Should | Proposed |
-| AA | Coming back after days is disorienting | "Previously on" recap | Recap screen from the stored summary, no AI call | Should | Proposed (Phase 7) |
-| AB | No content boundaries | Session zero, lines and veils | "Never include" field at New game, in the cached prefix | Should | Proposed (Phase 7) |
-| AC | Plan items with no phase | Everweave latency complaints | Streaming narration; better model for milestone and finale turns | Should | Proposed (assign a phase) |
+| Q | Checks are binary pass/fail | PbtA and Ironsworn three-band results; fail forward | Cost band just under the difficulty, plus natural 1/20 | Should, before Phase 5 | Accepted, Phase 5 (Character) |
+| R | No escape from a lethal fight | Roguelike fairness; OSR morale | Flee/surrender choice in every fight, enemy morale, defeat branch at 0 HP | Foundation for permadeath | Accepted, Phase 6 |
+| S | Danger is not telegraphed | Roguelike fairness ("enough information to decide") | Scene shows the threat before a fight; location danger visible | Should | Accepted, Phase 6 (location danger shown too) |
+| T | Enemy numbers have no source | Same rule as loot: code owns numbers | Enemy stat tables by tier and danger; AI names and describes only | Foundation | Accepted, Phase 6 |
+| U | Consumables do nothing | Combat plan allows "use an item" | Code table of item effects (heal, bonus, escape) | Foundation | Accepted, Phase 6 |
+| V | A milestone can stall | Three Clue Rule | 3 leads per milestone, unrevealed ones in the prompt | Should | Accepted, Phase 7 |
+| W | Time is not tracked, the AI invents dates | Observed in play; fronts and clocks need time | Code-owned day and time of day, advanced by travel and rest | Should | Accepted, Phase 7 |
+| X | Pressure (gap K) | Blades clocks, Dungeon World fronts, Ironsworn supply | Threat clock with portents on the main quest; supply optional | Should | Accepted (threat clock), Phase 7; supplies in Later |
+| Y | NPC attitude lives only in prose facts | CRPG disposition; OSR reaction rolls; NarrativeWorlds | Attitude -2..+2 per NPC, code-clamped, first-meeting reaction roll | Should | Accepted, Phase 7 |
+| Z | The player has no say over luck | Ironsworn momentum, Fate points | Small luck resource: earned on failures, spent for +2 after a roll | Later or Should | Later |
+| AA | Coming back after days is disorienting | "Previously on" recap | Recap screen from the stored summary, no AI call | Should | Accepted, Phase 8 |
+| AB | No content boundaries | Session zero, lines and veils | "Never include" field at New game, in the cached prefix | Should | Accepted, Phase 8 |
+| AC | Plan items with no phase | Everweave latency complaints | Streaming narration; better model for milestone and finale turns | Should | Streaming: Phase 8. Key-scene model: Later |
 
 Biggest hole was A. "Main quest with an ending" is a promise the AI cannot keep on its own.
 

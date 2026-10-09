@@ -35,7 +35,10 @@ Background research on existing products and the evidence behind these decisions
 | Platform | Mobile-first PWA with a tiny backend that holds the API key and the save data |
 | Items | Text only, no pictures |
 | Map | Text-based location list with connections, no drawn map in v1 |
-| Progression | XP, levels, equipment with stats, loot from code tables |
+| Progression | XP, levels, equipment with stats, loot from code tables. Reworked in the Character phase (5) |
+| Check results | Three results: success, success at a cost (missed by 1-2), failure; natural 1 and 20 are special. Code decides the band, the AI narrates it |
+| Pressure | Threat clock on the main quest with visible warning signs, plus a code-owned day and time of day |
+| Fair death | Every fight offers flee or surrender, enemies have morale, danger is shown before a fight, location danger is visible |
 | Scope | v1 is frozen (see below). Everything else goes in Later. |
 | Backend | Cloudflare Worker + KV, deployed from GitHub (Workers Builds). Shared game key, $1/day spend cap (DAILY_CAP_USD) |
 | Runtime models | Turns: Sonnet 5.5 at low effort. Summaries: Haiku 5.5. Both are config values |
@@ -44,15 +47,20 @@ Background research on existing products and the evidence behind these decisions
 ## v1 scope (frozen)
 
 - Story loop with options plus generic buttons
-- Main quest as a milestone graph, quest focus, side quests
+- Character creation and a revisited stat system (own phase, before combat)
+- Three-result checks (success, success at a cost, failure)
+- Main quest as a milestone graph with 3 leads per milestone, quest focus, side quests
+- Threat clock with warning signs, code-owned day and time of day
+- NPC attitude tracked by code
 - Policy for off-path custom actions (consequences, not refusals)
 - Rules engine with XP, levels, equipment and loot, clamped difficulty, visible dice
-- Code-resolved combat with one AI summary, permanent death
+- Code-resolved combat with one AI summary, permanent death, flee/surrender, enemy morale, code enemy tables, item effects
 - Text map with Travel, rest with random events
 - Memory: state, rolling summary, lore ledger
-- Backend: protected proxy with spend cap, JSON validation with retry, server-side saves with export/import
+- Backend: protected proxy with spend cap, JSON validation with retry, server-side saves with export/import, streaming narration
+- Recap on return, "never include" content field
 
-If the loop is not fun at this size, extras will not fix it.
+If the loop is not fun at this size, extras will not fix it. (The additions above came from the RPG practice review after Phase 4, gaps Q-AC in `RESEARCH.md`.)
 
 ## Core loop
 
@@ -65,9 +73,10 @@ If the loop is not fun at this size, extras will not fix it.
 ## Screens (phone-first, thumb-reachable)
 
 - **Story:** narration on top, option buttons pinned at the bottom. Dice results shown for every check (roll, modifier, difficulty, result).
-- **Character:** stats, HP, XP/level, equipment, inventory, conditions.
+- **Character:** stats, HP, XP/level, equipment, inventory, conditions (designed in the Character phase).
 - **Journal:** main quest progress, side quests, focused quest, past scene history.
-- **New game:** setting, tone, character creation.
+- **New game:** setting, tone, "never include" list, character creation.
+- **Recap:** "previously on" from the stored summary when the app opens after a break (no AI call).
 
 ## Generic buttons (hardcoded, no AI cost)
 
@@ -79,6 +88,8 @@ The AI cannot be trusted to steer toward an ending on its own, so the ending is 
 
 - At game start, the AI generates once a **milestone graph**: 6-12 milestones, each with yes/no completion conditions, ending in a defined finale. Stored as data, not prose.
 - Each milestone has a status: undiscovered, ongoing, completed.
+- Each milestone gets at least **3 leads** (Three Clue Rule): clues that point to a place, person or item where progress can be made. Code tracks which leads are revealed; unrevealed ones go into the prompt so the AI always has a way forward to offer.
+- **Threat clock:** the main quest has a clock of 6-8 segments with an impending doom and warning signs (portents), generated with the graph. Code ticks it on failures, rests, travel and time passing; each tick puts its warning sign into the story; a full clock makes the doom happen (a hard setback, not automatic game over). Completing milestones can push it back.
 - Each turn the prompt includes only the current milestone and a hint at the next one.
 - The AI reports quest flags in its output; code checks the conditions and advances the graph.
 - Finishing the final milestone ends the game with an epilogue.
@@ -102,7 +113,10 @@ The Custom action button invites the AI to say yes to everything. Handle it expl
 
 ## Rules (deliberately tiny)
 
-- 3 stats, d20 + stat vs. a difficulty, HP, XP and levels, equipment with stats (damage, multiplier, defense).
+- 3 stats, d20 + stat vs. a difficulty, HP, XP and levels, equipment with stats (damage, multiplier, defense). Stats, numbers and level-ups get revisited in the Character phase.
+- **Three results** per check: success (total >= difficulty), success at a cost (missed by 1-2: you get it, but something is lost, damaged or complicated), failure (the story still moves forward). Natural 20 always succeeds well, natural 1 always fails badly. Code picks the result; the AI must narrate exactly that result.
+- **Time:** code owns the day number and time of day (morning, afternoon, evening, night). Travel, rest and some actions advance it; the prompt shows it every turn, so the AI does not invent dates.
+- **NPC attitude:** each NPC has an attitude from -2 (hostile) to +2 (friendly). The AI proposes changes, code allows at most 1 step per turn, and attitude shifts the difficulty of social checks. A first meeting gets a code-rolled reaction the AI must honor.
 - Code owns all rules and dice. The AI never rolls or changes numbers directly. It proposes, code validates and applies.
 - **Difficulty is clamped by code** to a range based on level and location danger. The AI proposes, code limits. Log the difficulty distribution so drift is visible.
 - Loot comes from code tables. The AI only names and describes items.
@@ -115,18 +129,21 @@ The Custom action button invites the AI to say yes to everything. Handle it expl
 - Each round: player damage numbers and multipliers resolve, damage is applied, then enemies attack, then next round.
 - Player choices during combat are minimal and mechanical (which ability or item to use), not narrated.
 - Uses equipment stats, XP and loot from the rules engine.
+- **Enemies come from code tables** by tier and location danger (HP, damage, defense, morale). The AI only names and describes them, as with loot.
+- **Items do something:** a code table of consumable effects (heal, bonus, escape) for "use an item" in combat and outside it.
+- **Fair death:** a fight never starts without warning unless the player attacked; the scene shows the threat first. Every round offers flee or surrender (flee is a check with a cost; surrender leads to capture or a price, not death). Enemies check morale when they lose a member or half their strength and may flee or surrender. Location danger is shown (header and Travel list); option text stays neutral.
 - When combat ends, ONE AI call receives the structured combat log and writes an in-universe combat summary.
 - Death is permanent. If HP hits 0, the run ends with a short AI-written epilogue.
 
 ## Map and travel (text-based)
 
 - Known locations live in the ledger, each with connections and travel info.
-- A **Travel** button lists reachable locations. Choosing one costs no AI call until arrival, when the AI narrates the new scene.
+- A **Travel** button lists reachable locations with their danger level. Travel advances time. Choosing one costs no AI call until arrival, when the AI narrates the new scene.
 - The AI may add locations via new_facts; code adds them to the known map when the player learns of them.
 
 ## Rest and camp
 
-- Rest restores some HP, with a chance of a random event from the wildcard table.
+- Rest restores some HP, advances time and the threat clock, with a chance of a random event from the wildcard table.
 - A full camp scene is a Later item.
 
 ## Memory architecture (the key part)
@@ -169,8 +186,8 @@ The AI has no memory. The app stores everything and rebuilds a compact prompt ev
 
 ## Backend and reliability
 
-- **Proxy protection:** shared secret or login, per-day spend cap, request size limit. Model tiering: cheaper model for options and summaries, better model for key scenes.
-- **Failure handling:** schema validation with automatic retry, fall back to a safe generic turn when the AI fails, stream narration, make turns idempotent so a half-finished turn can be resumed after closing the app.
+- **Proxy protection:** shared secret or login, per-day spend cap, request size limit. Model tiering: cheaper model for summaries (done in Phase 4); a better model for key scenes is in Later.
+- **Failure handling:** schema validation with automatic retry, fall back to a safe generic turn when the AI fails, stream narration (Phase 8), make turns idempotent so a half-finished turn can be resumed after closing the app.
 - **Saves:** stored server-side (KV or database in the backend), plus manual export and import. localStorage alone is not safe on iOS with permanent death. Verify iOS storage behavior early.
 - **Dice fairness:** the dice result is fixed per turn (seeded), so regenerating narration or options cannot be used to reroll.
 
@@ -180,10 +197,11 @@ The AI has no memory. The app stores everything and rebuilds a compact prompt ev
 2. **Backend and schema:** protected proxy (Cloudflare Worker or Vercel function), spend cap, server-side save, memory schema (state, summary, ledger, milestone graph). One real AI turn, JSON validation with retry, the turn writes to the ledger.
 3. **Rules engine:** dice, HP, XP and levels, equipment, loot tables, difficulty clamps, visible dice, state persistence. Start with a small read-only Ledger view in the More sheet (entities and their facts, no AI call) so the memory can be checked while playing.
 4. **Retrieval and prompt assembly:** token budget per section, rolling summary, ledger retrieval, last-N turns, option variety, prompt caching of the static prefix, debug view of the assembled prompt.
-5. **Combat:** code-resolved rounds, combat log, one AI summary call, permanent death and epilogue.
-6. **Quest structure:** milestone graph generation, quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
-7. **Map and polish:** text map and Travel, rest with random events, generic buttons, character screen, journal, Codex (known NPCs, places, factions, items with their facts; edit and delete), new game flow, export/import, home screen icon.
-8. **Tuning:** bot-played test runs of 100+ turns logging tokens per turn, contradictions against the ledger, option repetition and difficulty distribution. Try a cheaper model. Add regenerate-with-fixed-dice and a pressure mechanic if the loop feels too safe.
+5. **Character:** character creation (content decided in depth at the start of the phase), the stat system and what each stat does, numbers and difficulty scale, level-ups and XP pace, three-result checks, Character screen. Works through the "Character progression review" below. Comes before combat so combat is built on the final stats.
+6. **Combat:** code-resolved rounds, enemy tables, item effects, flee/surrender and morale, danger shown before fights and in the header, combat log, one AI summary call, permanent death and epilogue.
+7. **Quest structure:** milestone graph generation with 3 leads per milestone, threat clock with warning signs, day and time of day, NPC attitude and first-meeting reactions, quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
+8. **Map and polish:** text map and Travel (with danger and time), rest with random events, generic buttons, journal, Codex (known NPCs, places, factions, items with their facts; edit and delete), new game flow with the "never include" field, recap on return, streaming narration, export/import, home screen icon.
+9. **Tuning:** bot-played test runs of 100+ turns logging tokens per turn, contradictions against the ledger, option repetition and difficulty distribution. Try a cheaper model. Add regenerate-with-fixed-dice; tune the threat clock if the loop feels too safe.
 
 ## Model and effort per phase
 
@@ -195,10 +213,11 @@ My usage limit is a real constraint, so default to Sonnet at medium effort and m
 | 2 Backend and schema | Opus (budget option: Sonnet at high) | High | The memory schema is hard to change later |
 | 3 Rules engine | Sonnet | Medium | Clear rules, well specified |
 | 4 Retrieval and prompt assembly | Opus (budget option: Sonnet at high) | High | Core of consistency and cost, subtle to get right |
-| 5 Combat | Sonnet | Medium | Deterministic code plus one AI call |
-| 6 Quest structure | Sonnet | High | Milestone graph and action classification are prompt-design heavy. Try Opus if the output is poor |
-| 7 Map and polish | Sonnet | Medium | Mostly UI and glue |
-| 8 Tuning | Sonnet | Medium | Reading logs and adjusting. High only for a stubborn problem |
+| 5 Character | Sonnet | High | Design-heavy: the stat system is hard to change later. Try Opus if the recommendations feel thin |
+| 6 Combat | Sonnet | Medium | Deterministic code plus one AI call. High if morale and flee rules get tricky |
+| 7 Quest structure | Sonnet | High | Milestone graph, leads, threat clock and action classification are prompt-design heavy. Try Opus if the output is poor |
+| 8 Map and polish | Sonnet | Medium | Mostly UI and glue; streaming needs care |
+| 9 Tuning | Sonnet | Medium | Reading logs and adjusting. High only for a stubborn problem |
 
 Do not use the highest effort modes (Max, Ultra Code) for this project. The work is well specified.
 
@@ -206,21 +225,20 @@ Runtime models for the game itself are a separate question (see Open questions a
 
 ## Should have (schedule, may slip)
 
-- Ledger duplicate names: the same person can end up as two entities (e.g. "The woman by the hearth", then "Maren" once named). Merge or alias them on rename. Phase 4 added a `was` field to new_facts: code renames the entity, keeps the old name as an alias and merges two records if both exist (counted as `merges`). Measure it in the Phase 8 bot runs; the Codex in Phase 7 gets manual edit/merge.
+- Ledger duplicate names: the same person can end up as two entities (e.g. "The woman by the hearth", then "Maren" once named). Merge or alias them on rename. Phase 4 added a `was` field to new_facts: code renames the entity, keeps the old name as an alias and merges two records if both exist (counted as `merges`). Measure it in the Phase 9 bot runs; the Codex in Phase 8 gets manual edit/merge.
 
 - Regenerate narration/options with the dice result kept fixed
-- Pressure on the player: day counter and consumable supplies, or a threat clock on the main quest (needs a decision)
 - Bot-played consistency and cost tests
 
-## Character progression review (added after Phase 3, not yet planned in detail)
+## Character progression review (input for Phase 5 Character)
 
-Phase 3 shipped a first guess: 3 stats at +0..+2, +1 to the lowest stat per level, 20 XP per level, level cap 10, stats only add to d20 rolls (plus a +1 gear bonus). Revisit with real play data, ideally in Phase 8 and the stat-choice part with the Character screen in Phase 7:
+Phase 3 shipped a first guess: 3 stats at +0..+2, +1 to the lowest stat per level, 20 XP per level, level cap 10, stats only add to d20 rolls (plus a +1 gear bonus). Revisit in Phase 5 (Character), then balance with bot-play data in Phase 9:
 - Revise the starting stats and the size of the numbers (maybe larger values than +0..+2, with the difficulty band scaled to match).
 - Let the player choose which stat gets the level-up point (now automatic).
 - Bot-play XP and level-ups to balance pace: XP per roll, XP per level, how many turns a level takes.
 - Revisit the max level (now 10) and what happens at the cap.
-- Show XP gained in one note per turn (roll XP and the AI's bonus XP are separate lines now, e.g. "+3 XP" then "+2 XP"). Small UI fix, fits Phase 7.
-- Decide what each stat should actually do. Now: might, wits and grit only add to rolls, and combat (Phase 5) will need its own use for them.
+- Show XP gained in one note per turn (roll XP and the AI's bonus XP are separate lines now, e.g. "+3 XP" then "+2 XP"). Small UI fix, fits Phase 5.
+- Decide what each stat should actually do. Now: might, wits and grit only add to rolls, and combat (Phase 6) will need its own use for them.
 
 ## Later (not in v1)
 
@@ -229,6 +247,9 @@ Phase 3 shipped a first guess: 3 stats at +0..+2, +1 to the lowest stat per leve
 - Drawn map
 - Item pictures
 - Consistency-check call against stored facts
+- Better model or higher effort for key scenes (milestones, finale)
+- Luck points: a small resource earned on failures, spent for +2 after seeing a roll (Ironsworn momentum style)
+- Supplies as a resource (only if the threat clock is not enough pressure)
 - Mythic-style Chaos Factor and scene-check twists for random events
 - Oracle button (yes/no questions with odds, resolved by code)
 - Legacy between runs
@@ -237,6 +258,6 @@ Phase 3 shipped a first guess: 3 stats at +0..+2, +1 to the lowest stat per leve
 
 - Which model for milestone graph generation? (Turns and summaries are decided, see Decisions.)
 - How long should the main quest be (number of turns), and how is it paced?
-- Should the character be fully AI-generated at the start or hand-built from a template?
+- Character creation: decided in depth at the start of Phase 5 (a pick-list of archetype, drive and flaw is one candidate).
 - Is the milestone graph generated once by the AI at game start, or picked from a few hand-written templates per setting?
-- Pressure mechanic: supplies and day counter, a threat clock, or neither in v1?
+- Threat clock details: what ticks it and by how much, and what a full clock does (Phase 7).

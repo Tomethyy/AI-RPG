@@ -48,7 +48,7 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.19"; // stamped by stamp.py
+const JS_BUILD = "1.21"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Look", "Talk", "Travel", "Rest"];
 const MORE = ["Ledger", "Prompt", "Inventory", "Wildcard", "Custom action"];

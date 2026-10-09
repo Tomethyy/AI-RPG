@@ -59,7 +59,7 @@ export function newEntity(id, type, name, turn, fields = {}) {
 
 const OPENING_SUMMARY = "Ash came to the old toll house at the Rusted Ford in heavy rain and found the bridge burned. Drovers sat over cold stew; a woman by the hearth was sewing a seal onto a leather satchel.";
 
-// Hand-built starting template (the Phase 1 opening). Phase 7 replaces this with the New game flow.
+// Hand-built starting template (the Phase 1 opening). Phase 5 (character creation) and Phase 8 (New game flow) replace it.
 export function newGame(slot = "main", now = new Date().toISOString()) {
   const ford = "location-the-rusted-ford";
   const save = {
@@ -104,7 +104,7 @@ export function newGame(slot = "main", now = new Date().toISOString()) {
     quests: {
       main: {
         title: "The Burned Bridge",
-        // Placeholder graph until Phase 6 generates one per game.
+        // Placeholder graph until Phase 7 generates one per game.
         milestones: {
           "m1": { id: "m1", title: "Learn who burned the bridge at the Rusted Ford", conditions: ["The player knows who ordered the burning"], status: "ongoing", next: ["m2"] },
           "m2": { id: "m2", title: "Find out why they want the road closed", conditions: ["The player learns what the closed road protects or hides"], status: "undiscovered", next: ["m3"] },
