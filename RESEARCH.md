@@ -105,6 +105,24 @@ Established techniques from human-run and solo games that address problems this 
 ### Standard CRPG features (checklist pass)
 A second pass compared the plan with the usual RPG feature list rather than with known problems (the first pass missed alignment that way). Covered already: character creation, stats, levels and XP, gear and loot, conditions, rest and healing, quest log, map and travel, companions (Later). Missing and now added: an economy (merchants, prices, selling; without it coins and spare loot are worthless), inventory limits (item slots in the style of Knave, where slots depend on a stat and big items take more), and a difficulty setting at New game, which most CRPGs offer.
 
+### Broad checklist pass (tabletop, CRPG, solo, roguelike, AI GM)
+A third pass went through the standard feature list by area and checked each item against the plan and the code. Findings that were new:
+- **Level scaling (CRPG, Oblivion):** scaling enemies and checks with the player's level makes progression feel pointless; Morrowind's fixed-danger areas and the Nehrim mod are the usual counter-examples. Our Phase 3 difficulty band rises with level (8-11 at level 1, 15-18 at level 10) while stats grow about +3 each, so a typical success rate falls from about 65% to about 45%. Fix: difficulty from place and obstacle tier, not from player level.
+- **The AI speaks for the player (FIREBALL study, arXiv 2305.01528):** the most common evaluator complaint about an LLM DM was the model making player characters act or speak. Forum and developer reports add positivity bias (the model declares success, never challenges) and skipped checks. Fix: narrator rules, plus code-owned results we already have.
+- **Meaningful choice (CRPG design writing):** the illusion of choice (options that converge), cosmetic consequences and black-and-white morality are the usual failures; consequences must be readable ("someone noticed"). Baldur's Gate 3's reactivity came from treating itself as a dungeon master, referencing earlier deeds, and making failure content rather than punishment.
+- **Retry rules (Disco Elysium):** white checks can be retried only after something changes; red checks are one-shot. Repeating the same failed check is otherwise a grind.
+- **Advantage/disadvantage, help and group checks (D&D 5e):** standard ways to reward help and preparation without new stats.
+- **Builds (CRPG balance):** trap options and dominant builds; respec is the usual safety valve, and its cost decides how much choices weigh.
+- **NPCs (GM advice):** give each NPC a want, a fear, one or two quirks, a speech pattern and a secret tied to the story; avoid pure good or evil.
+- **Combat (turn-based design):** enemies that do one thing are boring; give roles and several moves; readable or telegraphed enemy intent turns guesses into decisions; deterministic status effects are too strong, so they get a chance to land.
+- **Loot (CRPG writing):** small stat bumps are a treadmill; meaningful items change how you play; cursed or drawback items (Pathfinder curse types, the Wizardry 8 sword) create real trade-offs.
+- **Exploration (Jaquays-style design):** loops, multiple entrances and secrets make exploring rewarding.
+- **Quests (Avellone's side-quest rules, PC Gamer on fetch quests):** short, tied to the world, with their own conflict, never upstaging the main quest; players must know what to do and why.
+- **Endings (Fallout, Choice of Games):** modular epilogue slides cover NPC and place fates; a single "do you win?" ending makes choices weigh less, so a late branch point with several final chapters ("arm and fingers") is preferred.
+- **Onboarding:** teach rules at the moment they are first needed, start in motion with choices open.
+- **Roguelike meta:** a hall of fame or memorial of past runs is a basic expectation.
+- **Accessibility (Game Accessibility Guidelines):** adjustable text size is the simplest high-impact feature; clean sans-serif fonts, good line spacing and no text over textures.
+
 ### Table practices
 - Session zero and safety tools (lines: never include; veils: happens off-screen) are standard at the start of a campaign. For a solo AI game this is a "never include" field at New game, stored with the setting (it lives in the cached prefix, so it costs nothing per turn).
 - A "previously on" recap at the start of a session is standard GM practice and helps a phone player who returns after days. We already store the rolling summary, so it needs no AI call.
@@ -126,7 +144,7 @@ A second pass compared the plan with the usual RPG feature list rather than with
 
 Priority: **Foundation** means v1 would feel broken or be unsafe without it. **Should** means clearly valuable. **Later** is optional.
 
-Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later. Q-AI came from the review after Phase 4; their status shows what was accepted. Character creation got its own phase (5) before combat.
+Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later. Q-AV came from the reviews after Phase 4; their status shows what was accepted. Character creation got its own phase (5) before combat.
 
 | # | Gap | Why it matters (evidence) | Fix | Priority | Status in PLAN.md |
 |---|---|---|---|---|---|
@@ -163,6 +181,19 @@ Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under 
 | AG | Coins and spare loot have no use | Shops are standard in nearly every RPG | Merchants, code price table, selling at a fraction | Should | Accepted, prices Phase 6, shops Phase 8 |
 | AH | Inventory has no limit | Knave-style item slots | Slots from a stat, big items take 2 | Should | Accepted, Phase 5 |
 | AI | One difficulty for everyone | Standard CRPG setting | Story / Normal / Hard at New game | Should | Accepted, Phase 8 |
+| AJ | Difficulty rises with player level | Oblivion criticism; our own numbers (65% -> 45%) | Difficulty from place and obstacle tier | Foundation | Accepted, Phase 5 |
+| AK | No character abilities | Combat plan needs "which ability" | Talents picked at level-ups | Should | Accepted, Phase 5 |
+| AL | Help and preparation have no mechanical effect | D&D 5e advantage/disadvantage | Two seeded dice, keep better or worse | Should | Accepted, Phase 5 |
+| AM | Early picks can be traps | CRPG respec practice | Retrain one pick at level-up | Should | Not taken |
+| AN | The AI decides for the character, is too agreeable | FIREBALL; developer and forum reports | Narrator rules in the prompt | Foundation | Accepted, Phase 5 |
+| AO | NPCs blur together | GM NPC advice | Want, fear, secret, voice per named NPC | Should | Accepted, Phase 7 |
+| AP | Failed checks can be ground out | Disco Elysium white/red checks | No retry without a change | Should | Accepted, Phase 5 |
+| AQ | Fights feel the same, enemy moves are guesses | Turn-based combat design | Enemy roles, status effects with chances, visible intent | Should | Accepted, Phase 6 |
+| AR | Gear is only bigger numbers | Loot design, cursed items | Unique items with properties or drawbacks | Should | Accepted, Phase 6 |
+| AS | Exploring is not rewarded | Jaquays-style design | One code-known secret per location | Should | Accepted, Phase 8 |
+| AT | One fixed ending | Choice of Games "arm and fingers"; Fallout | Branching finale, epilogue built from choices | Should | Accepted, Phase 7 |
+| AU | Dead characters vanish | Roguelike hall of fame | Hall of fallen heroes | Should | Accepted, Phase 8 |
+| AV | Fixed text size, no guidance | Accessibility guidelines; onboarding practice | Text size setting, one-time tips | Should | Accepted, Phase 8 |
 | AD | No sense of who the character has become | D&D alignment; morality meter research | Two hidden axes, label on change, world reacts, nothing locked | Should | Accepted, Phase 5 (axes) and Phase 7 (reactions) |
 | AC | Plan items with no phase | Everweave latency complaints | Streaming narration; better model for milestone and finale turns | Should | Streaming: Phase 8. Key-scene model: Later |
 
@@ -190,4 +221,5 @@ Biggest hole was A. "Main quest with an ending" is a promise the AI cannot keep 
 - Roguelike permadeath: Game Developer, "The game design lessons of permadeath"; r/roguelikedev FAQ Friday #19 (Cogmind); Bugnet, "How to make a roguelike feel fair"; Blade RPG, "One life"
 - PAYADOR (arxiv.org/abs/2504.07304); "World-State Transformations for Neuro-symbolic Interactive Storytelling" (arXiv 2605.24719); "AI Agent Systems" survey (arXiv 2601.01743); Kumyol, "NarrativeWorlds" (HKUST, 2026)
 - Morality systems: The Artifice, "Morality systems in role-playing games"; Formosa et al., "Morality meters and their impacts on moral choices in videogames" (Games and Culture, 2022; philarchive.org/rec/FORMMA-4); Sarian, DiGRAA 2024 paper (digraa.org); GamesBeat, "Morality metrics in video games"; PC Gamer, "Why math is strangling videogame morality"; Steam discussions on Pathfinder: Wrath of the Righteous alignment (player reports)
+- Broad pass: Gnome Stew, "5 mistakes of the new GM"; Zatu, "Key mistakes to avoid as a GM"; Wayline and GeekChamp on the illusion of choice; GamesBeat, "Consequences are what count, not choices"; FIREBALL (arxiv.org/pdf/2305.01528); Leading EDJE, "Building a digital dungeon master with Semantic Kernel"; Giant in the Playground "AI Dungeon Master" thread; RPG Codex and Steam threads on Oblivion level scaling; GameBanshee and Gfinity on Disco Elysium checks; Bugnet, "How to design a respec system"; ARPG balance paper (faculty.uca.edu); Irresistible Force and Reality Blurs on memorable NPCs; Giant Bomb on Fallout New Vegas endings; Choice of Games, "End game and victory design"; Gnome Stew, "Slide show campaign endings"; Game Accessibility Guidelines; Wayline on tutorials; The Alexandrian, "In medias res"; RPG Maker, "Proper enemy design"; Game World Observer on Untamed Tactics; PC Gamer, "Stop adding loot"; Bugnet, "How to design meaningful loot"; GameBanshee, "RPG design: cursed items"; Archives of Nethys cursed items; The Alexandrian and Bumbling Through Dungeons on Jaquaysing; PC Gamer on fetch quests; GameBanshee on Avellone's side-quest rules; Larian BAFTA talk coverage (Yahoo/PC Gamer); rlgallery.org statistics; itch.io roguelike hall of fame thread
 - 2026 apps: Auferet (peerpush.com/p/auferet, toolradar.com), Eidolon Engine (Gumroad listing), Jenova articles (vendor), Converge, "Best AI text adventure games 2026"

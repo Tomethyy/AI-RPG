@@ -35,9 +35,11 @@ Background research on existing products and the evidence behind these decisions
 | Platform | Mobile-first PWA with a tiny backend that holds the API key and the save data |
 | Items | Text only, no pictures |
 | Map | Text-based location list with connections, no drawn map in v1 |
-| Progression | XP, levels, equipment with stats, loot from code tables. Reworked in the Character phase (5) |
+| Progression | XP, levels, equipment with stats, loot from code tables. Reworked in the Character phase (5): talents, advantage/disadvantage, and difficulty that does not scale with the player's level |
 | Check results | Three results: success, success at a cost (missed by 1-2), failure; natural 1 and 20 are special. Code decides the band, the AI narrates it |
 | Pressure | Threat clock on the main quest with visible warning signs, plus a code-owned day and time of day |
+| Narrator | Never decides or speaks for the character beyond the chosen action; NPCs have their own wants and can refuse or lie; earlier deeds get called back |
+| Ending | Branching finale: one path until late, then a telegraphed key decision splits into 2-3 finales. The epilogue is built from your choices |
 | Morality | Two independent hidden axes (Law-Chaos, Good-Evil), shown as a label like "Chaotic Good". Deeds shift it; the world reacts to it; nothing gets locked |
 | Economy | Coins buy and sell at merchants; prices come from a code table, the AI only names wares |
 | Inventory | Item slots: a fixed number (e.g. 10 + Grit), big items take 2 |
@@ -58,6 +60,10 @@ Background research on existing products and the evidence behind these decisions
 - NPC attitude tracked by code
 - Two-axis morality (alignment) that deeds shift and the world reacts to
 - Economy: merchants, buying and selling with code prices; inventory item slots; difficulty setting
+- Talents, advantage/disadvantage, no level scaling of difficulty, no retry without change
+- Narrator rules, NPC profiles (want, fear, secret, voice)
+- Enemy roles and visible intent, unique items with properties or drawbacks, location secrets
+- Branching finale, epilogue from your choices, hall of fallen heroes, text size setting and first-time tips
 - Policy for off-path custom actions (consequences, not refusals)
 - Rules engine with XP, levels, equipment and loot, clamped difficulty, visible dice
 - Code-resolved combat with one AI summary, permanent death after a defeat branch, flee/surrender, enemy morale, code enemy tables, item effects
@@ -82,6 +88,8 @@ If the loop is not fun at this size, extras will not fix it. (The additions abov
 - **Character:** stats, HP, XP/level, equipment, inventory, conditions (designed in the Character phase).
 - **Journal:** main quest progress, side quests, focused quest, past scene history.
 - **New game:** setting, tone, "never include" list, character creation.
+- **Hall of fallen heroes:** past characters with level, turns survived, cause of death (or ending) and their epilogue. No AI cost.
+- **Settings:** text size; one-time tips the first time dice, combat or a shop appear.
 - **Recap:** "previously on" from the stored summary when the app opens after a break (no AI call).
 
 ## Generic buttons (hardcoded, no AI cost)
@@ -98,7 +106,8 @@ The AI cannot be trusted to steer toward an ending on its own, so the ending is 
 - **Threat clock:** the main quest has a clock of 6-8 segments with an impending doom and warning signs (portents), generated with the graph. Code ticks it on failures, rests, travel and time passing; each tick puts its warning sign into the story; a full clock makes the doom happen (a hard setback, not automatic game over). Completing milestones can push it back.
 - Each turn the prompt includes only the current milestone and a hint at the next one.
 - The AI reports quest flags in its output; code checks the conditions and advances the graph.
-- Finishing the final milestone ends the game with an epilogue.
+- **Branching finale:** the graph is one path until late in the game, then a key decision (telegraphed as a real fork, e.g. side with the Wardens, expose Hale, or make a deal) splits it into 2-3 branches, each with its own last 1-2 milestones and finale. All branches are generated once at game start; only one is played.
+- Finishing the final milestone ends the game with an **epilogue built from your choices**: the fate of the NPCs and places you touched (from the ledger, quest flags and NPC attitude) and who you became (alignment), Fallout-style. A death epilogue uses the same builder.
 - Side quests are surfaced deliberately (they are often missed otherwise): when the scene touches a side quest's location or NPC, at least one option may reference it.
 
 ## Quest focus (how the player steers an AI-driven game)
@@ -128,8 +137,13 @@ The Custom action button invites the AI to say yes to everything. Handle it expl
 - **Difficulty:** Story / Normal / Hard at New game. It shifts the difficulty band, enemy strength and how forgiving the defeat branch is. Stored per save.
 - **NPC attitude:** each NPC has an attitude from -2 (hostile) to +2 (friendly). The AI proposes changes, code allows at most 1 step per turn, and attitude shifts the difficulty of social checks. A first meeting gets a code-rolled reaction the AI must honor.
 - Code owns all rules and dice. The AI never rolls or changes numbers directly. It proposes, code validates and applies.
-- **Difficulty is clamped by code** to a range based on level and location danger. The AI proposes, code limits. Log the difficulty distribution so drift is visible.
-- Loot comes from code tables. The AI only names and describes items.
+- **Difficulty is clamped by code** to a range based on location danger and the tier of the obstacle, **not on the player's level**, so levelling up really makes you better (the Phase 3 band rises with level and drops a typical success rate from about 65% at level 1 to about 45% at level 10; fix in Phase 5). The AI proposes, code limits. Log the difficulty distribution so drift is visible.
+- **Advantage / disadvantage:** help, the right tool or a friendly NPC lets a check roll two dice and keep the better; bad conditions keep the worse. Both dice are seeded per turn, so this is never a reroll.
+- **Talents:** at some level-ups the player picks an ability (e.g. "Second wind", "Silver tongue") with a code-defined effect, usable in and out of combat. Defined in Phase 5.
+- **No retry without change:** a failed approach cannot simply be repeated; something must change first (new information, a tool, help, a different stat). Code tracks recently failed approaches; the AI does not re-offer them unchanged.
+- **Narrator rules (prompt):** never decide, feel or speak for the character beyond the chosen action; NPCs want things, can refuse, lie and act on their own; no "What do you do?" endings or purple prose; call back to the player's earlier deeds so consequences are visible.
+- **NPC profiles:** each named NPC gets a want, a fear, a secret and a voice or quirk, stored in the ledger and shown when the NPC is relevant, so they act consistently and sound different. The secret is revealed only through play.
+- Loot comes from code tables. The AI only names and describes items. Rare **unique items** have a code-defined property and sometimes a drawback (a blade that cannot be put down, armor that slows travel) instead of only bigger numbers.
 - Option text stays neutral. Each option carries a suggested stat and difficulty internally, but the player sees no risk or reward hints.
 - Every check shows its roll, modifier, difficulty and result.
 
@@ -139,7 +153,8 @@ The Custom action button invites the AI to say yes to everything. Handle it expl
 - Each round: player damage numbers and multipliers resolve, damage is applied, then enemies attack, then next round.
 - Player choices during combat are minimal and mechanical (which ability or item to use), not narrated.
 - Uses equipment stats, XP and loot from the rules engine.
-- **Enemies come from code tables** by tier and location danger (HP, damage, defense, morale). The AI only names and describes them, as with loot.
+- **Enemies come from code tables** by tier and location danger (HP, damage, defense, morale). The AI only names and describes them, as with loot. Tables have **roles** (brute, skirmisher, caster, leader) with different moves, plus a few status effects with a chance to land, so fights differ.
+- **Enemy intent is shown** each round ("The brute winds up a heavy swing"), so the player's choice is informed (Slay the Spire style).
 - **Items do something:** a code table of consumable effects (heal, bonus, escape) for "use an item" in combat and outside it.
 - **Fair death:** a fight never starts without warning unless the player attacked; the scene shows the threat first. Every round offers flee or surrender (flee is a check with a cost; surrender leads to capture or a price, not death). Enemies check morale when they lose a member or half their strength and may flee or surrender. Location danger is shown (header and Travel list); option text stays neutral.
 - When combat ends, ONE AI call receives the structured combat log and writes an in-universe combat summary.
@@ -149,6 +164,7 @@ The Custom action button invites the AI to say yes to everything. Handle it expl
 ## Map and travel (text-based)
 
 - Known locations live in the ledger, each with connections and travel info.
+- **Location secrets:** each place gets a hidden feature that code knows about (a cache, a passage, a clue). A good Look around can find it, which rewards exploring.
 - A **Travel** button lists reachable locations with their danger level. Travel advances time. Choosing one costs no AI call until arrival, when the AI narrates the new scene.
 - The AI may add locations via new_facts; code adds them to the known map when the player learns of them.
 
@@ -208,10 +224,10 @@ The AI has no memory. The app stores everything and rebuilds a compact prompt ev
 2. **Backend and schema:** protected proxy (Cloudflare Worker or Vercel function), spend cap, server-side save, memory schema (state, summary, ledger, milestone graph). One real AI turn, JSON validation with retry, the turn writes to the ledger.
 3. **Rules engine:** dice, HP, XP and levels, equipment, loot tables, difficulty clamps, visible dice, state persistence. Start with a small read-only Ledger view in the More sheet (entities and their facts, no AI call) so the memory can be checked while playing.
 4. **Retrieval and prompt assembly:** token budget per section, rolling summary, ledger retrieval, last-N turns, option variety, prompt caching of the static prefix, debug view of the assembled prompt.
-5. **Character:** character creation (content decided in depth at the start of the phase), the stat system and what each stat does, numbers and difficulty scale, level-ups and XP pace, three-result checks, morality axes (starting alignment, shifts, label), item slots, Character screen. Works through the "Character progression review" below. Comes before combat so combat is built on the final stats.
-6. **Combat:** code-resolved rounds, enemy tables, item effects and item prices (designed with gear), flee/surrender and morale, danger shown before fights and in the header, combat log, one AI summary call, defeat branch at 0 HP, permanent death and epilogue.
-7. **Quest structure:** milestone graph generation with 3 leads per milestone, threat clock with warning signs, day and time of day, NPC attitude and first-meeting reactions (shaped by alignment), quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
-8. **Map and polish:** text map and Travel (with danger and time), rest with random events, generic buttons, journal, Codex (known NPCs, places, factions, items with their facts; edit and delete), new game flow with the "never include" field and difficulty setting, merchants and shops, recap on return, streaming narration, export/import, home screen icon.
+5. **Character:** character creation (content decided in depth at the start of the phase), the stat system and what each stat does, numbers and difficulty scale, level-ups and XP pace, three-result checks, advantage/disadvantage, talents, difficulty no longer tied to level, no retry without change, narrator rules, morality axes (starting alignment, shifts, label), item slots, Character screen. Works through the "Character progression review" below. Comes before combat so combat is built on the final stats.
+6. **Combat:** code-resolved rounds, enemy tables with roles and visible intent, status effects, item effects, unique items, item prices (designed with gear), flee/surrender and morale, danger shown before fights and in the header, combat log, one AI summary call, defeat branch at 0 HP, permanent death and epilogue.
+7. **Quest structure:** milestone graph generation with 3 leads per milestone, threat clock with warning signs, day and time of day, NPC attitude and first-meeting reactions (shaped by alignment), NPC profiles, branching finale, epilogue built from choices, quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
+8. **Map and polish:** text map and Travel (with danger and time), rest with random events, generic buttons, journal, Codex (known NPCs, places, factions, items with their facts; edit and delete), new game flow with the "never include" field and difficulty setting, merchants and shops, location secrets, hall of fallen heroes, text size setting and first-time tips, recap on return, streaming narration, export/import, home screen icon.
 9. **Tuning:** bot-played test runs of 100+ turns logging tokens per turn, contradictions against the ledger, option repetition and difficulty distribution. Try a cheaper model. Add regenerate-with-fixed-dice; tune the threat clock if the loop feels too safe.
 
 ## Model and effort per phase
@@ -249,6 +265,7 @@ Phase 3 shipped a first guess: 3 stats at +0..+2, +1 to the lowest stat per leve
 - Bot-play XP and level-ups to balance pace: XP per roll, XP per level, how many turns a level takes.
 - Revisit the max level (now 10) and what happens at the cap.
 - Show XP gained in one note per turn (roll XP and the AI's bonus XP are separate lines now, e.g. "+3 XP" then "+2 XP"). Small UI fix, fits Phase 5.
+- Difficulty must stop rising with level (see Rules); check that a level-10 character succeeds more often than a level-1 one in the same place.
 - XP for finishing quests and milestones, not only for rolls (Ironsworn gives XP for completed vows). Decide the split between roll XP, AI bonus XP and quest XP.
 - Decide what each stat should actually do. Now: might, wits and grit only add to rolls, and combat (Phase 6) will need its own use for them.
 
