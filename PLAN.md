@@ -4,10 +4,30 @@ A lightweight, AI-driven solo pen-and-paper RPG for my iPhone. The AI proposes o
 
 Background research on existing products and the evidence behind these decisions is in `RESEARCH.md`. Do not read it unless a question needs it.
 
+## Status
+
+- **Done:** Phases 1-4 (skeleton, backend and schema, rules engine, retrieval and prompt assembly), verified on the phone. Scope reviews after Phase 4 are folded into this plan and `RESEARCH.md`.
+- **Next:** Phase 5 Character (Sonnet, High). It starts with the in-depth character creation questions.
+- **Cost baseline (after Phase 4):** about 4.4k input tokens a turn (half from cache), about 680 output tokens, about $0.012 a turn.
+- **Known issues:**
+  - Fallbacks: 3 in the first 6 turns of the current game, cause unknown (the last 5 are now logged in More → Prompt). Check whether they recur.
+  - The Prompt view's token estimate counts only prompt text; real input is about twice as high because the JSON schema and request overhead are not counted.
+  - XP shows as two notes per turn (roll XP and bonus XP). Fix in Phase 5.
+  - Every new game still starts from the hand-built Rusted Ford template (replaced by character creation in Phase 5 and the New game flow in Phase 8).
+
 **Working rules for Claude Code:**
 - Build one phase at a time, starting with Phase 1. Ask me about any open question that blocks the current phase. Do not build ahead.
 - At the end of each phase: stop, give me a 3-line summary of what works, commit, and tell me which model and effort level to use for the NEXT phase (see "Model and effort per phase"). You cannot switch the model yourself, so remind me to do it. Do not start the next phase until I say go.
 - If a phase turns out harder than its recommendation, tell me and suggest moving up one level instead of grinding at the current one.
+- **Scope freeze:** no new v1 features until Phase 9 is done. New ideas go to Later. Exceptions: bugs, and things a phase proves necessary (say so and ask).
+- **Main always playable:** `main` deploys straight to the phone, so push only when all tests pass (unit tests and the automated end-to-end run against `worker/test/mock-anthropic.mjs`). Run `python3 stamp.py` before every commit that changes the app or the Worker.
+- **Save safety:** every save-format upgrade keeps a copy of the old save on the server before migrating, and has a test that migrates an old save.
+- **Definition of done** for a phase:
+  - unit tests and the end-to-end run pass
+  - a short **phone test checklist** (what to tap, what you should see) is handed to me, and I have ticked it off
+  - a **cost report** compares tokens per turn (input, cached, output) and cost with the baseline in Status, and explains any increase
+  - README and this plan (including Status) are updated
+- **Playtest notes:** after each phase I play about 20 turns and name 3 things that feel off; they go into Known issues and are weighed at the start of the next phase.
 
 ## Why this exists
 
@@ -235,7 +255,7 @@ Every phase that adds a section must fit it into the budget (rebalancing the oth
 2. **Backend and schema:** protected proxy (Cloudflare Worker or Vercel function), spend cap, server-side save, memory schema (state, summary, ledger, milestone graph). One real AI turn, JSON validation with retry, the turn writes to the ledger.
 3. **Rules engine:** dice, HP, XP and levels, equipment, loot tables, difficulty clamps, visible dice, state persistence. Start with a small read-only Ledger view in the More sheet (entities and their facts, no AI call) so the memory can be checked while playing.
 4. **Retrieval and prompt assembly:** token budget per section, rolling summary, ledger retrieval, last-N turns, option variety, prompt caching of the static prefix, debug view of the assembled prompt.
-5. **Character:** character creation (content decided in depth at the start of the phase), the stat system and what each stat does, numbers and difficulty scale, level-ups and XP pace, three-result checks, advantage/disadvantage, talents, difficulty no longer tied to level, no retry without change, narrator rules, morality axes (starting alignment, shifts, label), item slots, Character screen. Works through the "Character progression review" below, with XP pace sized for a 150-250 turn game. Comes before combat so combat is built on the final stats.
+5. **Character:** character creation (content decided in depth at the start of the phase), the stat system and what each stat does, numbers and difficulty scale, level-ups and XP pace, three-result checks, advantage/disadvantage, talents, difficulty no longer tied to level, no retry without change, narrator rules, morality axes (starting alignment, shifts, label), item slots, Character screen. Works through the "Character progression review" below, with XP pace sized for a 150-250 turn game. Housekeeping first: split `app.js` into a few plain files (no build step), add the automated end-to-end test (a 30-turn run of the Worker against the mock) to `npm test`, and add the keep-a-copy-before-migrating step for saves. Comes before combat so combat is built on the final stats.
 6. **Combat:** (the defeat branch's "rescued by a friendly NPC" and threat-clock costs are hooked up in Phase 7, once NPC attitude and the clock exist) code-resolved rounds, enemy tables with roles and visible intent, status effects, item effects, unique items, item prices (designed with gear), flee/surrender and morale, danger shown before fights and in the header, combat log, one AI summary call, defeat branch at 0 HP, permanent death and epilogue.
 7. **Quest structure:** milestone graph generation with 3 leads per milestone, threat clock with warning signs, day and time of day, NPC attitude and first-meeting reactions (shaped by alignment), NPC profiles, branching finale, epilogue built from choices, quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
 8. **Map and polish:** text map and Travel (with danger and time), rest with random events, generic buttons, journal, Codex (known NPCs, places, factions, items with their facts; edit and delete), new game flow with the "never include" field and difficulty setting, merchants and shops, location secrets, hall of fallen heroes, text size setting and first-time tips, recap on return, streaming narration, export/import, home screen icon.
