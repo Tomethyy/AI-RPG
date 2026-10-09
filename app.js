@@ -48,7 +48,7 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.17"; // stamped by stamp.py
+const JS_BUILD = "1.18"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Look", "Talk", "Travel", "Rest"];
 const MORE = ["Ledger", "Prompt", "Inventory", "Wildcard", "Custom action"];
@@ -346,6 +346,7 @@ function ledgerLine(label, text) {
 }
 
 function showLedger(on) {
+  sheet.scrollTop = 0;
   $("ledger").hidden = !on;
   $("sheetBody").hidden = on;
   $("serverForm").hidden = on;
