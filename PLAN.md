@@ -9,8 +9,11 @@ Background research on existing products and the evidence behind these decisions
 - **Done:** Phases 1-4 (skeleton, backend and schema, rules engine, retrieval and prompt assembly), verified on the phone. Scope reviews after Phase 4 are folded into this plan and `RESEARCH.md`.
 - **Next:** Phase 5 Character (Sonnet, High). It starts with the in-depth character creation questions.
 - **Cost baseline (after Phase 4):** about 4.4k input tokens a turn (half from cache), about 680 output tokens, about $0.012 a turn.
-- **Known issues:**
-  - Fallbacks: 3 in the first 6 turns of the current game, cause unknown (the last 5 are now logged in More → Prompt). Check whether they recur.
+- **Known issues (playtest notes after Phase 4, weighed at the start of Phase 5):**
+  - **Too many failures** (5 in a row). The dice are fair (checked: every face 5%, no streak bias). Causes: the AI proposes difficulties from a 6-18 scale and mostly 12+, so the clamp pins almost every check to the top of the band (DC 12 at level 2); the band rises with level (level 2 came fast); and pass/fail has no middle. With +2 vs 12 that is 55% success; target about 65-70% for an average check. Fix in Phase 5: difficulty not tied to level, a sensible default difficulty in the prompt, three-result checks.
+  - **Ledger clutter.** The AI logs moment-to-moment events as facts ("drew his belt knife and seated Ash on a stool"); Known facts was at 531/900 tokens by turn 11. Fix in Phase 5: facts are only lasting truths (identity, wants, relationships, revealed secrets, status changes), events go to the summary; a per-entity fact cap, and a cheap Haiku pass that merges an entity's facts when it exceeds the cap.
+  - **Slow pacing.** One small encounter (Reeve) took about 6 turns, so 150-250 turns may not reach 8-10 milestones. Fix: narrator rule to resolve minor beats quickly and cut to the next real decision (Phase 5); turns per milestone in Phase 7; measured in the Phase 9 bot runs (shorten the milestone count if needed).
+  - Fallbacks: 3 in the first 6 turns, none in the next 5; probably the deploy restart (the last 5 are logged in More → Prompt).
   - The Prompt view's token estimate counts only prompt text; real input is about twice as high because the JSON schema and request overhead are not counted.
   - XP shows as two notes per turn (roll XP and bonus XP). Fix in Phase 5.
   - Every new game still starts from the hand-built Rusted Ford template, and there is no background lore: names and lore are improvised turn by turn (recorded in the ledger). Fixed by the world core (Phase 5), region generation (Phase 7) and the New game flow (Phase 8).
