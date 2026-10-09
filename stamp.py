@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stamp the build into index.html, style.css and app.js. Run before every commit that gets deployed.
+"""Stamp the build into index.html (every script, the stylesheet and the manifest link), style.css and app.js. Run before every commit that gets deployed.
 
 The version is 1.<commit count + 1>; the time is UTC and shown in local time by the app (More sheet).
 """
@@ -18,7 +18,7 @@ def sub(name, pattern, repl):
     p.write_text(new)
 
 sub("index.html", r'<meta name="build" content="[^"]*">', f'<meta name="build" content="{ver}|{now}">')
-sub("index.html", r'(style\.css|app\.js|manifest\.webmanifest)\?v=[^"]*', rf'\1?v={ver}')
+sub("index.html", r'([\w-]+\.(?:css|js|webmanifest))\?v=[^"]*', rf'\1?v={ver}')
 sub("style.css", r'--build: "[^"]*";', f'--build: "{ver}";')
 sub("app.js", r'const JS_BUILD = "[^"]*";', f'const JS_BUILD = "{ver}";')
 print("stamped", ver, now)

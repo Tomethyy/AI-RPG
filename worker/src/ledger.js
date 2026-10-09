@@ -2,6 +2,9 @@
 import { ENTITY_TYPES, newEntity, slugify } from "./schema.js";
 import { rollDanger } from "./rules.js";
 
+export const FACT_CAP = 8; // above this a cheap model merges an entity's facts (factmerge.js)
+export const FACT_HARD = 12; // if that has not happened yet, the oldest facts after the first are dropped
+
 export const norm = (s) => String(s || "").toLowerCase().replace(/^(the|a|an)\s+/, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
 export function findEntity(save, name, type) {
@@ -108,6 +111,7 @@ export function applyNewFacts(save, facts, turn) {
       e.facts.push({ text, turn });
       added++;
     }
+    if (e.facts.length > FACT_HARD) e.facts = [e.facts[0], ...e.facts.slice(-(FACT_HARD - 1))];
     e.last_turn = turn;
   }
   return added;

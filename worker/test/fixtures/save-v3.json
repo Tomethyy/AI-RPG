@@ -1,0 +1,345 @@
+{
+ "v": 3,
+ "id": "11111111-2222-3333-4444-555555555555",
+ "slot": "main",
+ "created_at": "2026-10-01T10:00:00.000Z",
+ "updated_at": "2026-10-01T10:00:00.000Z",
+ "settings": {
+  "language": "English",
+  "setting": "Gritty low fantasy frontier: muddy roads, river crossings, toll houses, feuding guilds, little magic and all of it feared.",
+  "tone": "Grounded and wry. Danger is real but quiet. Short, concrete sentences."
+ },
+ "turn": 3,
+ "scene": {
+  "location_id": "location-the-rusted-ford",
+  "narration": [
+   "Rain hammers the old toll house as you shoulder through the door. Inside, a handful of drovers hunch over cold stew, and nobody looks up. The bridge outside is gone; only blackened stumps remain in the river.",
+   "A woman by the hearth is sewing a seal onto a leather satchel. She notices your mud-caked boots and finally meets your eye."
+  ],
+  "options": [
+   {
+    "text": "Ask again",
+    "kind": "social",
+    "stat": "wits",
+    "difficulty": 12
+   },
+   {
+    "text": "Search the stable",
+    "kind": "explore",
+    "stat": "wits",
+    "difficulty": 16
+   },
+   {
+    "text": "Leave",
+    "kind": "cautious",
+    "stat": "grit",
+    "difficulty": 8
+   }
+  ]
+ },
+ "actors": {
+  "pc": {
+   "id": "pc",
+   "kind": "pc",
+   "name": "Ash",
+   "ledger_id": null,
+   "level": 3,
+   "xp": 45,
+   "hp": 14,
+   "hp_max": 28,
+   "stats": {
+    "might": 2,
+    "wits": 3,
+    "grit": 2
+   },
+   "equipment": {
+    "weapon": {
+     "id": "item-worn-shortsword",
+     "name": "Worn shortsword",
+     "slot": "weapon",
+     "rarity": "common",
+     "bonus_stat": "might",
+     "damage": 3,
+     "mult": 1
+    },
+    "armor": {
+     "id": "item-oiled-coat",
+     "name": "Oiled travel coat",
+     "slot": "armor",
+     "rarity": "common",
+     "bonus_stat": "grit",
+     "defense": 1
+    }
+   },
+   "inventory": [
+    {
+     "id": "item-coin",
+     "name": "Coins",
+     "qty": 12,
+     "note": ""
+    },
+    {
+     "id": "item-rations",
+     "name": "Trail rations",
+     "qty": 3,
+     "note": ""
+    },
+    {
+     "id": "item-iron-dagger",
+     "name": "Iron dagger",
+     "qty": 1,
+     "note": "",
+     "gear": {
+      "id": "item-iron-dagger",
+      "name": "Iron dagger",
+      "slot": "weapon",
+      "rarity": "fine",
+      "bonus_stat": "wits",
+      "damage": 4,
+      "mult": 1.1
+     }
+    }
+   ],
+   "conditions": []
+  }
+ },
+ "party": [
+  "pc"
+ ],
+ "ledger": {
+  "entities": {
+   "location-the-rusted-ford": {
+    "id": "location-the-rusted-ford",
+    "type": "location",
+    "name": "The Rusted Ford",
+    "aliases": [
+     "Rusted Ford",
+     "toll house"
+    ],
+    "location_id": null,
+    "connections": [
+     "location-gull-s-landing"
+    ],
+    "facts": [
+     {
+      "text": "An old toll house on the river road",
+      "turn": 1
+     },
+     {
+      "text": "The bridge was burned; only blackened stumps remain",
+      "turn": 1
+     }
+    ],
+    "first_turn": 1,
+    "last_turn": 1,
+    "danger": 0
+   },
+   "npc-maren": {
+    "id": "npc-maren",
+    "type": "npc",
+    "name": "Maren",
+    "aliases": [],
+    "location_id": "location-the-rusted-ford",
+    "connections": [],
+    "facts": [
+     {
+      "text": "Sews seals onto satchels",
+      "turn": 2
+     }
+    ],
+    "first_turn": 2,
+    "last_turn": 2
+   },
+   "location-gull-s-landing": {
+    "id": "location-gull-s-landing",
+    "type": "location",
+    "name": "Gull's Landing",
+    "aliases": [],
+    "location_id": null,
+    "connections": [
+     "location-the-rusted-ford"
+    ],
+    "facts": [
+     {
+      "text": "A ferry landing downriver",
+      "turn": 2
+     }
+    ],
+    "first_turn": 2,
+    "last_turn": 2,
+    "danger": 0
+   }
+  }
+ },
+ "quests": {
+  "main": {
+   "title": "The Burned Bridge",
+   "milestones": {
+    "m1": {
+     "id": "m1",
+     "title": "Learn who burned the bridge at the Rusted Ford",
+     "conditions": [
+      "The player knows who ordered the burning"
+     ],
+     "status": "ongoing",
+     "next": [
+      "m2"
+     ]
+    },
+    "m2": {
+     "id": "m2",
+     "title": "Find out why they want the road closed",
+     "conditions": [
+      "The player learns what the closed road protects or hides"
+     ],
+     "status": "undiscovered",
+     "next": [
+      "m3"
+     ]
+    },
+    "m3": {
+     "id": "m3",
+     "title": "Reopen the road",
+     "conditions": [
+      "The crossing is usable again or the culprit is stopped"
+     ],
+     "status": "undiscovered",
+     "next": []
+    }
+   },
+   "current": "m1",
+   "finale": "m3"
+  },
+  "side": {},
+  "focus": "main"
+ },
+ "summary": {
+  "text": "Ash came to the old toll house at the Rusted Ford in heavy rain and found the bridge burned. Drovers sat over cold stew; a woman by the hearth was sewing a seal onto a leather satchel.",
+  "through_turn": 0,
+  "requested_through": 0,
+  "requested_at": null
+ },
+ "recent": [
+  {
+   "n": 1,
+   "ts": "2026-10-01T10:01:00.000Z",
+   "action": {
+    "kind": "option",
+    "text": "Ask Maren about the seal"
+   },
+   "dice": {
+    "die": 9,
+    "mod": 2,
+    "dc": 11,
+    "dc_proposed": 14,
+    "label": "Wits",
+    "success": true,
+    "note": "difficulty 14 adjusted to 11"
+   },
+   "narration": [
+    "Maren shrugs.",
+    "Rain falls."
+   ],
+   "options": [
+    {
+     "text": "Ask again",
+     "kind": "social",
+     "stat": "wits",
+     "difficulty": 12
+    },
+    {
+     "text": "Search the stable",
+     "kind": "explore",
+     "stat": "wits",
+     "difficulty": 16
+    },
+    {
+     "text": "Leave",
+     "kind": "cautious",
+     "stat": "grit",
+     "difficulty": 8
+    }
+   ],
+   "classification": "allowed",
+   "state_changes": [],
+   "events": [
+    "+3 XP"
+   ],
+   "new_facts": [],
+   "quest_flags": [],
+   "location_id": "location-the-rusted-ford",
+   "model": "claude-sonnet-5-5",
+   "attempts": 1,
+   "usage": {},
+   "cost": 0.01
+  },
+  {
+   "n": 2,
+   "ts": "2026-10-01T10:02:00.000Z",
+   "action": {
+    "kind": "option",
+    "text": "Ask Maren about the seal"
+   },
+   "dice": {
+    "die": 10,
+    "mod": 2,
+    "dc": 11,
+    "dc_proposed": 14,
+    "label": "Wits",
+    "success": false,
+    "note": "difficulty 14 adjusted to 11"
+   },
+   "narration": [
+    "Maren shrugs.",
+    "Rain falls."
+   ],
+   "options": [
+    {
+     "text": "Ask again",
+     "kind": "social",
+     "stat": "wits",
+     "difficulty": 12
+    },
+    {
+     "text": "Search the stable",
+     "kind": "explore",
+     "stat": "wits",
+     "difficulty": 16
+    },
+    {
+     "text": "Leave",
+     "kind": "cautious",
+     "stat": "grit",
+     "difficulty": 8
+    }
+   ],
+   "classification": "allowed",
+   "state_changes": [],
+   "events": [
+    "+3 XP"
+   ],
+   "new_facts": [],
+   "quest_flags": [],
+   "location_id": "location-the-rusted-ford",
+   "model": "claude-sonnet-5-5",
+   "attempts": 1,
+   "usage": {},
+   "cost": 0.01
+  }
+ ],
+ "last": null,
+ "counters": {
+  "ai_turns": 2,
+  "fallbacks": 0,
+  "retries": 0,
+  "dc": {
+   "11": 2
+  },
+  "dc_clamped": 2,
+  "summaries": 0,
+  "merges": 0,
+  "options_dropped": 0,
+  "variety_low": 0,
+  "kinds": {}
+ }
+}

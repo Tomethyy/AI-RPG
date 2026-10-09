@@ -2,13 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { newGame, migrate, RECENT_PROMPT } from "../src/schema.js";
 import { applyNewFacts, findEntity } from "../src/ledger.js";
-import { buildPrompt, BUDGET, estTokens, fit, RULES } from "../src/prompt.js";
+import { buildPrompt, BUDGET, estTokens, fit, RULES, rollText } from "../src/prompt.js";
+import { WORLD } from "../src/world.js";
+import { recordFailure, rollOption } from "../src/rules.js";
 import { varyOptions } from "../src/ai.js";
 import { summaryDue, summaryJob, adoptSummary, updateSummary, summaryPrompt } from "../src/summary.js";
 
-const opt = (text, kind = "social") => ({ text, kind, stat: "wits", difficulty: 10 });
+const opt = (text, kind = "social") => ({ text, kind, stat: "wits", tier: "standard", edge: "none", edge_why: "" });
 const record = (n, extra = {}) => ({
-  n, action: { kind: "option", text: `Do thing ${n}` }, dice: { die: 10, mod: 1, dc: 10, label: "Wits", success: true },
+  n, action: { kind: "option", text: `Do thing ${n}` }, dice: { die: 10, mod: 1, dc: 10, label: "Wits", result: "success", success: true },
   narration: [`Turn ${n} narration. ` + "The rain keeps falling on the road and the drovers mutter. ".repeat(4)],
   options: [opt(`Option A${n}`), opt(`Option B${n}`, "explore"), opt(`Option C${n}`, "direct")], ...extra,
 });
@@ -32,9 +34,9 @@ test("every section stays inside its budget, however long the campaign", () => {
   const short = buildPrompt(newGame(), { kind: "look", text: "Look around" }, null);
   const long = buildPrompt(longSave(), { kind: "custom", text: "x".repeat(300) }, null);
   for (const sec of long.sections) if (sec.budget) assert.ok(sec.tokens <= sec.budget, `${sec.name}: ${sec.tokens} > ${sec.budget}`);
-  const cap = Object.values(BUDGET).reduce((a, b) => a + b, 0) + estTokens(RULES) + 100;
+  const cap = Object.values(BUDGET).reduce((a, b) => a + b, 0) + estTokens(RULES) + estTokens(WORLD) + 100;
   assert.ok(long.est.total <= cap, `${long.est.total} > ${cap}`);
-  assert.ok(long.est.total < 5000);
+  assert.ok(long.est.total < 6500);
   assert.ok(short.est.total < long.est.total);
   // turn 500 and turn 5000 cost the same
   assert.ok(Math.abs(buildPrompt(longSave(5000), { kind: "look", text: "Look around" }, null).est.total - buildPrompt(longSave(500), { kind: "look", text: "Look around" }, null).est.total) < 30);
@@ -44,7 +46,7 @@ test("cache layout: static system prefix, stable summary block, volatile rest", 
   const s = longSave(40);
   const a = buildPrompt(s, { kind: "look", text: "Look around" }, null);
   s.actors.pc.hp = 3;
-  const b = buildPrompt(s, { kind: "custom", text: "Climb the wall" }, { die: 3, mod: 0, dc: 12, label: "Might", success: false });
+  const b = buildPrompt(s, { kind: "custom", text: "Climb the wall" }, { die: 3, mod: 0, dc: 12, label: "Might", result: "failure", success: false });
   assert.equal(a.system[0].text, RULES);
   assert.deepEqual(a.system[1].cache_control, { type: "ephemeral" });
   const [stableA, volA] = a.messages[0].content;
@@ -53,7 +55,26 @@ test("cache layout: static system prefix, stable summary block, volatile rest", 
   assert.equal(stableA.text, stableB.text); // hp, action and dice don't break the cache
   assert.notEqual(volA.text, volB.text);
   assert.ok(!stableA.text.includes("HP ") && volB.text.includes("Climb the wall"));
-  assert.ok(estTokens(RULES) > 512 / 1.3); // with the setting block, above the 512-token cache minimum
+  assert.ok(estTokens(RULES) > 512 / 1.3); // with the world block, above the 512-token cache minimum
+  assert.ok(a.system[1].text.includes("The Realm of Calder") && !a.system[1].text.includes("gritty"));
+});
+
+test("the prompt carries the character, the three results and the failed approaches", () => {
+  const s = newGame("main", undefined, { name: "Wren", background: "hunter", drive: "revenge", flaw: "greedy", law: "chaotic", good: "good", free: { grit: 1, charm: 1 }, talent: "keen-eye" });
+  s.turn = 5;
+  s.recent = [record(5)];
+  const text = (p) => p.messages[0].content[1].text;
+  const plain = buildPrompt(s, { kind: "look", text: "Look around" }, null);
+  for (const w of ["Wren", "Hunter", "charm +1", "Chaotic Good", "Drive: Someone wronged you", "Flaw: Greedy", "Keen Eye", "Pack 2/13 slots"]) assert.ok(text(plain).includes(w), w);
+  assert.ok(!text(plain).includes("Failed approaches"));
+  recordFailure(s, { kind: "option", text: "Pick the lock" }, { result: "failure" });
+  assert.ok(text(buildPrompt(s, { kind: "look", text: "Look around" }, null)).includes("Failed approaches (do not offer again unless something has clearly changed)\nPick the lock"));
+  const d = rollOption(s, { text: "x", kind: "explore", stat: "wits", tier: "hard", edge: "advantage", edge_why: "lantern" });
+  assert.match(rollText(d), /^d20 \d+ \(advantage, best of \d+ and \d+\) \+\d Wits = \d+ vs difficulty 13: (SUCCESS|FAILURE|SUCCESS AT A COST)/);
+  assert.match(rollText({ die: 11, mod: 1, dc: 13, label: "Might", result: "cost" }), /SUCCESS AT A COST/);
+  assert.match(rollText({ die: 20, mod: 1, dc: 13, label: "Might", result: "success", crit: 20 }), /NATURAL 20/);
+  assert.match(rollText({ die: 5, mod: 1, dc: 13, label: "Might", success: false }), /FAILURE/); // a record from before Phase 5
+  for (const w of ["SUCCESS AT A COST", "never decide, feel or speak for the player's character", "tier", "lasting truths", "Pace:"]) assert.ok(RULES.includes(w), w);
 });
 
 test("turns since the summary: newest verbatim, the rest in brief, none lost", () => {
@@ -159,13 +180,13 @@ test("summary failure keeps the old summary and records the error", async () => 
   assert.equal(spent, 0);
 });
 
-test("v2 saves migrate to v3", () => {
+test("v2 saves migrate forward", () => {
   const s = newGame();
   s.v = 2;
   s.summary = { text: "", through_turn: 0 };
   s.counters = { ai_turns: 3, fallbacks: 0, retries: 0, dc: {}, dc_clamped: 0 };
   migrate(s);
-  assert.equal(s.v, 3);
+  assert.equal(s.v, 4);
   assert.equal(s.summary.requested_through, 0);
   assert.equal(s.counters.ai_turns, 3);
   assert.deepEqual(s.counters.kinds, {});

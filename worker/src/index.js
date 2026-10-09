@@ -1,10 +1,13 @@
 // AI-RPG backend (Cloudflare Worker): shared-secret proxy to the Claude API, daily spend cap, server-side save.
-import { newGame, migrate, publicState, ledgerView, RECENT_PROMPT, RECENT_KEEP, SUMMARY_BATCH, ARCHIVE_CHUNK } from "./schema.js";
+import { newGame, migrate, publicState, ledgerView, SCHEMA_VERSION, RECENT_PROMPT, RECENT_KEEP, SUMMARY_BATCH, ARCHIVE_CHUNK } from "./schema.js";
 import { applyNewFacts, ensureLocation } from "./ledger.js";
-import { runTurn, fallbackTurn, varyOptions, DEFAULT_TURN_MODEL, DEFAULT_SUMMARY_MODEL } from "./ai.js";
+import { runTurn, fallbackTurn, varyOptions, DEFAULT_TURN_MODEL, DEFAULT_SUMMARY_MODEL, SCHEMA_TEXT, SCHEMA_TOKENS } from "./ai.js";
 import { buildPrompt, BUDGET } from "./prompt.js";
 import { adoptSummary, summaryDue, summaryJob, updateSummary } from "./summary.js";
-import { rollOption, applyChanges, logDifficulty } from "./rules.js";
+import { adoptFactMerge, mergeDue, mergeJob, runFactMerge } from "./factmerge.js";
+import { rollOption, applyChanges, logDifficulty, consumeEdge, recordFailure, clearFailures, applyPick, useTalent, dropItem } from "./rules.js";
+import { validateCharacter, DEFAULT_CHARACTER } from "./character.js";
+import { creationTables } from "./content.js";
 
 const SERVER_VERSION = 1;
 const MAX_BODY = 4096; // bytes; a turn request is a few hundred
@@ -56,9 +59,17 @@ function capUSD(env) {
   return Number.isFinite(n) && n >= 0 ? n : DEFAULT_CAP_USD;
 }
 
+// An older save is copied to "bak:<slot>:v<old version>" before it is migrated and stored, once; then it stays on the new version.
 async function loadSave(env) {
-  const save = await env.GAME.get(`save:${SLOT}`, "json");
-  return save ? migrate(save) : null;
+  const raw = await env.GAME.get(`save:${SLOT}`);
+  if (!raw) return null;
+  const save = JSON.parse(raw);
+  if (save.v === SCHEMA_VERSION) return save;
+  const from = save.v ?? 1;
+  const migrated = migrate(save); // throws on a save from a newer server, leaving it untouched
+  await env.GAME.put(`bak:${SLOT}:v${from}`, raw);
+  await storeSave(env, migrated);
+  return migrated;
 }
 
 async function storeSave(env, save) {
@@ -103,6 +114,7 @@ async function handleTurn(request, env, ctx) {
   if (save.last?.request_id === requestId) return json({ ...save.last.response, replay: true });
   if (body.turn !== save.turn) return json({ error: "stale", state: await stateWithSpend(env, save) }, 409);
   await adoptSummary(env, save);
+  if (save.fm) await adoptFactMerge(env, save);
 
   const action = resolveAction(save, body.action);
   if (!action) return json({ error: "bad_action" }, 400);
@@ -137,6 +149,9 @@ async function handleTurn(request, env, ctx) {
   for (const o of t.options) save.counters.kinds[o.kind] = (save.counters.kinds[o.kind] || 0) + 1;
   // Code owns state: the rules engine validates every proposed change; only the location move needs the ledger.
   const { changes: checked, events } = applyChanges(save, t.state_changes, dice);
+  consumeEdge(save, dice);
+  recordFailure(save, action, dice);
+  if (checked.some((c) => c.kind === "item_add" && c.applied)) clearFailures(save); // new gear counts as something changed
   const changes = checked.map((c) => {
     if (c.kind === "move" && c.text) {
       const from = save.ledger.entities[save.scene.location_id];
@@ -145,6 +160,7 @@ async function handleTurn(request, env, ctx) {
         if (!from.connections.includes(to.id)) from.connections.push(to.id);
         if (!to.connections.includes(from.id)) to.connections.push(from.id);
       }
+      if (save.scene.location_id !== to.id) clearFailures(save); // a new place counts as something changed
       save.scene.location_id = to.id;
       return { ...c, applied: true };
     }
@@ -173,11 +189,32 @@ async function handleTurn(request, env, ctx) {
   save.last = { request_id: requestId, response };
   await archiveTurn(env, save, record);
   const due = summaryDue(save);
-  const job = due && (await getSpend(env)) < capUSD(env) ? summaryJob(save, due) : null;
+  const underCap = (await getSpend(env)) < capUSD(env);
+  const job = due && underCap ? summaryJob(save, due) : null;
+  // One background job a turn (they share the spend counter): a summary when one is due, otherwise a fact merge.
+  const crowded = !job && underCap ? mergeDue(save) : null;
+  const fmJob = crowded ? mergeJob(save, crowded) : null;
   await storeSave(env, save);
-  // After the reply: fold old turns into the rolling summary (own KV key, adopted by the next request).
+  // After the reply: fold old turns into the rolling summary, or tidy an entity's facts (own KV keys, adopted by the next request).
   if (job) ctx.waitUntil(updateSummary(env, job, (usd) => addSpend(env, usd)));
+  if (fmJob) ctx.waitUntil(runFactMerge(env, fmJob, (usd) => addSpend(env, usd)));
   return json(response);
+}
+
+// Character screen actions (no AI call): pick a level-up reward, use a talent, drop an item.
+async function handleChar(request, env) {
+  const { body, error } = await readBody(request);
+  if (error) return json({ error }, 400);
+  const save = await loadSave(env);
+  if (!save) return json({ error: "no_game" }, 404);
+  let r;
+  if (body.act === "pick") r = applyPick(save, { kind: body.kind, stat: body.stat, talent: body.talent });
+  else if (body.act === "use") r = useTalent(save, String(body.id || ""));
+  else if (body.act === "drop") r = dropItem(save, String(body.id || ""));
+  else return json({ error: "bad_act" }, 400);
+  if (!r.ok) return json({ error: r.error, state: await stateWithSpend(env, save) }, 409);
+  await storeSave(env, save);
+  return json({ events: r.events, state: await stateWithSpend(env, save) });
 }
 
 // Debug view: the prompt the next turn would send (for an example action), section by section, plus the last turn's real usage.
@@ -186,6 +223,13 @@ async function handlePrompt(env) {
   const sum = await adoptSummary(env, save);
   const p = buildPrompt(save, { kind: "look", text: "Look around" }, null);
   const last = save.recent.at(-1);
+  // The JSON schema travels with every request and is not part of the prompt text; count it, then scale by the real/estimated ratio of the last turn.
+  const sections = [...p.sections, { name: "Output schema (sent with every request)", text: SCHEMA_TEXT, tokens: SCHEMA_TOKENS, budget: null, cached: false }];
+  const est = { cached: p.est.cached, volatile: p.est.volatile + SCHEMA_TOKENS, total: p.est.total + SCHEMA_TOKENS };
+  const u = last?.usage;
+  const real = u ? (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0) : 0;
+  const ratio = real && last.est_input ? Math.round((real / last.est_input) * 100) / 100 : null;
+  if (ratio) est.scaled = Math.round(est.total * ratio);
   const due = summaryDue(save);
   return json({
     turn: save.turn,
@@ -193,9 +237,10 @@ async function handlePrompt(env) {
     model: env.TURN_MODEL || DEFAULT_TURN_MODEL,
     summary_model: env.SUMMARY_MODEL || DEFAULT_SUMMARY_MODEL,
     budget: BUDGET,
-    est: p.est,
-    sections: p.sections,
-    last: last ? { n: last.n, model: last.model, attempts: last.attempts, usage: last.usage, cost: last.cost, est_input: last.est_input } : null,
+    est,
+    ratio,
+    sections,
+    last: last ? { n: last.n, model: last.model, attempts: last.attempts, usage: last.usage, cost: last.cost, est_input: last.est_input, real_input: real || undefined } : null,
     summary: {
       through_turn: save.summary.through_turn,
       words: save.summary.text ? save.summary.text.split(/\s+/).length : 0,
@@ -226,14 +271,18 @@ async function route(request, env, ctx) {
     return json(ledgerView(save));
   }
   if (pathname === "/api/prompt" && request.method === "GET") return handlePrompt(env);
+  if (pathname === "/api/creation" && request.method === "GET") return json(creationTables());
+  if (pathname === "/api/char" && request.method === "POST") return handleChar(request, env);
   if (pathname === "/api/turn" && request.method === "POST") return handleTurn(request, env, ctx);
   if (pathname === "/api/new" && request.method === "POST") {
     const { body, error } = await readBody(request);
     if (error) return json({ error }, 400);
     if (body.confirm !== true) return json({ error: "confirm_required" }, 400);
+    const picked = body.character === undefined ? { character: DEFAULT_CHARACTER } : validateCharacter(body.character);
+    if (picked.error) return json({ error: "bad_character", field: picked.error }, 400);
     const old = await env.GAME.get(`save:${SLOT}`);
     if (old) await env.GAME.put(`bak:${SLOT}`, old); // one step back, in case of a mis-tap
-    const save = newGame(SLOT);
+    const save = newGame(SLOT, undefined, picked.character);
     await storeSave(env, save);
     return json(await stateWithSpend(env, save));
   }

@@ -1,3 +1,4 @@
 node_modules/
 worker/.dev.vars
 worker/.wrangler/
+worker/test/.mock-calls.log

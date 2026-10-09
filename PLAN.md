@@ -6,17 +6,19 @@ Background research on existing products and the evidence behind these decisions
 
 ## Status
 
-- **Done:** Phases 1-4 (skeleton, backend and schema, rules engine, retrieval and prompt assembly), verified on the phone. Scope reviews after Phase 4 are folded into this plan and `RESEARCH.md`.
-- **Next:** Phase 5 Character (Sonnet, High). It starts with the in-depth character creation questions.
-- **Cost baseline (after Phase 4):** about 4.4k input tokens a turn (half from cache), about 680 output tokens, about $0.012 a turn.
-- **Known issues (playtest notes after Phase 4, weighed at the start of Phase 5):**
-  - **Too many failures** (5 in a row). The dice are fair (checked: every face 5%, no streak bias). Causes: the AI proposes difficulties from a 6-18 scale and mostly 12+, so the clamp pins almost every check to the top of the band (DC 12 at level 2); the band rises with level (level 2 came fast); and pass/fail has no middle. With +2 vs 12 that is 55% success; target about 65-70% for an average check. Fix in Phase 5: difficulty not tied to level, a sensible default difficulty in the prompt, three-result checks.
-  - **Ledger clutter.** The AI logs moment-to-moment events as facts ("drew his belt knife and seated Ash on a stool"); Known facts was at 531/900 tokens by turn 11. Fix in Phase 5: facts are only lasting truths (identity, wants, relationships, revealed secrets, status changes), events go to the summary; a per-entity fact cap, and a cheap Haiku pass that merges an entity's facts when it exceeds the cap.
-  - **Slow pacing.** One small encounter (Reeve) took about 6 turns, so 150-250 turns may not reach 8-10 milestones. Fix: narrator rule to resolve minor beats quickly and cut to the next real decision (Phase 5); turns per milestone in Phase 7; measured in the Phase 9 bot runs (shorten the milestone count if needed).
-  - Fallbacks: 3 in the first 6 turns, none in the next 5; probably the deploy restart (the last 5 are logged in More → Prompt).
-  - The Prompt view's token estimate counts only prompt text; real input is about twice as high because the JSON schema and request overhead are not counted.
-  - XP shows as two notes per turn (roll XP and bonus XP). Fix in Phase 5.
-  - Every new game still starts from the hand-built Rusted Ford template, and there is no background lore: names and lore are improvised turn by turn (recorded in the ledger). Fixed by the world core (Phase 5), region generation (Phase 7) and the New game flow (Phase 8).
+- **Done:** Phases 1-4 (skeleton, backend and schema, rules engine, retrieval and prompt assembly), verified on the phone. Phase 5 (Character) is built, tested (39 tests, including a 30-turn end-to-end run against the mock) and deployed; it waits for the phone checklist to be ticked.
+- **Next:** Phase 6 Combat (Sonnet, High), after the Phase 5 phone checklist and the next playtest notes.
+- **Cost baseline (after Phase 4, measured on the phone):** about 4.4k input tokens a turn (half from cache), about 680 output tokens, about $0.012 a turn.
+- **Cost after Phase 5 (estimated, to be confirmed in More → Prompt after a few real turns):** the cached prefix grows by about 1.1k estimated tokens (world core +0.6k, narrator and difficulty rules +0.5k); the uncached part by about 50 (character block) plus about 50 output tokens a turn (edge fields). About +$0.001 a turn (about $0.013). A turn after a pause of over 5 minutes re-writes the cache: about +$0.003 for the larger prefix. Still flat however long the campaign runs.
+- **Free-plan limits (30-turn end-to-end run):** save 19 KB (the verbatim window and the fact cap bound it; expect 60-120 KB at 250 turns); 3.6 KV writes a turn (about 275 turns a day against the 1,000-write limit); pure compute about 1 ms a turn against 10 ms CPU.
+- **Known issues (playtest notes after Phase 4), status after Phase 5:**
+  - **Too many failures:** fixed. The AI names a tier (easy 7, standard 10, hard 13, daunting 16, plus the place's danger 0-2); level is never used; a miss by 1-2 is "success at a cost". An average check is about 70% success (about 80% counting success at a cost); untrained about 55%. Level 1 and level 10 face the same numbers, so levelling really helps. The Prompt view shows the tier and result counts.
+  - **Ledger clutter:** fixed in the rules (only lasting truths), a cap of 8 facts per entity, and a Haiku pass that merges an entity's facts to at most 5 (a hard stop at 12). Judge on the phone: Known facts should stay well under budget.
+  - **Slow pacing:** a narrator rule now says to resolve minor beats in one turn. Turns per milestone are still measured in Phase 9 (the milestones themselves arrive in Phase 7).
+  - **Fallbacks:** 3 in the first 6 turns, none in the next 5; probably the deploy restart. Still watch More → Prompt for the last 5.
+  - **Prompt view estimate:** now counts the JSON schema and shows the estimate scaled by the last turn's real/estimated ratio.
+  - **XP notes:** one note a turn.
+  - **New games start from the Rusted Ford template:** the character is now made in New game and the world core gives the lore, but the opening scene is still the template. Fixed by region generation (Phase 7) and the New game flow (Phase 8).
 
 **Working rules for Claude Code:**
 - Build one phase at a time, starting with Phase 1. Ask me about any open question that blocks the current phase. Do not build ahead.
@@ -50,8 +52,8 @@ Background research on existing products and the evidence behind these decisions
 
 | Topic | Decision |
 |---|---|
-| Setting | v1 has one fixed world: classic medieval fantasy with low magic. Humans dominate; magic is real but rare, costly and distrusted; monsters live at the edges (wolves, bandits, the odd troll or ghost), in the spirit of The Witcher or Dragon Age. Choosing other settings (cyberpunk, pirates, ...) is v2 |
-| Content tables | **Not decided yet.** Decided at the start of the phase that first needs a table (Phase 5: talents). Proposal on the table: hand-written numbers in small JSON files, AI-generated names and flavor per region on top, checked against the templates. Alternatives: fully hand-written, or AI-generated within code limits |
+| Setting | v1 has one fixed world, the Realm of Calder (`worker/src/world.js`): normal fantasy in the spirit of The Witcher and Dragon Age. Humans dominate, elves and dwarves exist as tolerated minorities (the player is human); magic is real and powerful but uncommon, costly and distrusted (licensed mages of the Conclave, hunted hedge-mages); monsters are common in the wild; the Lantern Church, the Crown, the Concord guilds and the Karsk clans are the powers. Choosing other settings (cyberpunk, pirates, ...) is v2 |
+| Content tables | Numbers are hand-written (`worker/src/content.js`); the AI never sets a number. Decided for talents in Phase 5: 12 hand-written talents, with an optional AI re-skin of the flavor text later (Phase 8, when New game exists). Enemies and consumables (Phase 6) and prices (Phase 8) are decided in their phases |
 | Map bounds | The generated region is the map: its places plus a few the AI may add inside it (capped). Far places from the world core are known by name but lie beyond this story |
 | Side quests | Seeded and earned: region generation seeds 2-3 side quests tied to its factions and NPCs (with leads); in play the AI may propose new ones from what happens, at most one new open side quest at a time and a total cap |
 | World and lore | Two layers. A hand-written **world core**, fixed for v1 and cached in the prompt (~500 tokens, near zero cost per turn): the realm and its regions, a short history, how magic works and why it is distrusted, the main religion, 3-4 major powers, which monsters exist. Plus a **region generated once per New game** inside that world: starting area, 6-8 places, 3-4 local factions with goals, key NPCs, the central conflict, with the milestone graph and threat clock built on it, stored in the ledger. Every run gets new names and a new story in the same world |
@@ -62,14 +64,15 @@ Background research on existing products and the evidence behind these decisions
 | Platform | Mobile-first PWA with a tiny backend that holds the API key and the save data |
 | Items | Text only, no pictures |
 | Map | Text-based location list with connections, no drawn map in v1 |
-| Progression | XP, levels, equipment with stats, loot from code tables. Reworked in the Character phase (5): talents, advantage/disadvantage, and difficulty that does not scale with the player's level |
-| Check results | Three results: success, success at a cost (missed by 1-2), failure; natural 1 and 20 are special. Code decides the band, the AI narrates it |
+| Stats | Four: Might (force, melee), Wits (notice, know, sneak, ranged), Charm (talk, deceive, lead), Grit (endure, nerve; sets HP and pack slots). A background gives a +3/+2/+1/0 spread, plus 2 free points at creation (no stat above +4 then). HP = 16 + 2 x Grit + 3 per level above 1 |
+| Progression | XP (total to reach level 2-10: 40, 100, 190, 310, 460, 640, 860, 1120, 1420; the cap is 10 and XP stops there). Even levels give +1 to a stat you choose; odd levels from 3 give a talent (1 of 3 offered, seeded per game). Roll XP 2 (1 for a failure), the AI may add 1-3 for a notable moment, milestones 25 and side quests 10 (paid by the Phase 7 quest code). Difficulty does not scale with level |
+| Check results | Three results: success (total at least the difficulty), success at a cost (missed by 1-2), failure; a natural 20 always succeeds and a natural 1 always fails. Code decides the band, the AI narrates it |
 | Pressure | Threat clock on the main quest with visible warning signs, plus a code-owned day and time of day |
 | Narrator | Never decides or speaks for the character beyond the chosen action; NPCs have their own wants and can refuse or lie; earlier deeds get called back |
 | Ending | Branching finale: one path until late, then a telegraphed key decision splits into 2-3 finales. The epilogue is built from your choices |
 | Morality | Two independent hidden axes (Law-Chaos, Good-Evil), shown as a label like "Chaotic Good". Deeds shift it; the world reacts to it; nothing gets locked |
 | Economy | Coins buy and sell at merchants; prices come from a code table, the AI only names wares |
-| Inventory | Item slots: a fixed number (e.g. 10 + Grit), big items take 2 |
+| Inventory | Item slots: 10 + Grit (+2 with Pack Mule) for the pack; worn gear is free, big items (heavy armor, polearms) take 2, coins are free, small items stack 10 to a slot. A full pack leaves new loot behind, with a note |
 | Difficulty | Story / Normal / Hard, chosen at New game |
 | Fair death | Every fight offers flee or surrender, enemies have morale, danger is shown before a fight, location danger is visible |
 | Scope | v1 is frozen (see below). Everything else goes in Later. |
@@ -81,24 +84,17 @@ Background research on existing products and the evidence behind these decisions
 
 Everything below ships in v1, each item in its phase. If a phase runs long, it is split into parts (e.g. 6a and 6b); items are not postponed past their phase.
 
-Done (Phases 1-4): story loop and options, rules engine (dice, HP, XP, gear, loot, clamped difficulty, visible dice), memory (state, rolling summary, lore ledger, prompt budget and caching), backend (protected proxy, spend cap, JSON validation with retry, server-side saves).
+Done (Phases 1-5): story loop and options, rules engine (dice, HP, XP, gear, loot, visible dice), memory (state, rolling summary, lore ledger, prompt budget and caching), backend (protected proxy, spend cap, JSON validation with retry, server-side saves), and the Character phase: world core, character creation, 4 stats, difficulty tiers and three-result checks, advantage/disadvantage, 12 talents, level-up picks, alignment axes, item slots, no retry without change, narrator rules, the Character screen.
 
 | Item | Phase |
 |---|---|
-| World core (hand-written lore, cached) | 5 |
-| Character creation, revisited stat system, XP pace for a ~150-250 turn game | 5 |
-| Three-result checks, difficulty not tied to level, no retry without change | 5 |
-| Narrator rules (never act or speak for the character, NPCs can refuse and lie, callbacks) | 5 |
-| Talents (abilities to use in and out of combat) | 5 |
-| Advantage / disadvantage | 5 |
-| Two-axis morality (alignment) | 5 (axes), 7 (reactions) |
-| Item slots | 5 |
+| Two-axis morality: reactions of NPCs and the world (the axes, label and shifts are done) | 7 |
 | Code combat with enemy tables, item effects, one AI summary | 6 |
 | Fair death: flee/surrender, morale, danger shown first, enemy intent shown, defeat branch, permanent death | 6 |
 | Enemy roles and status effects | 6 |
 | Unique items with properties or drawbacks | 6 |
 | Region generated per game (places, factions, NPCs, conflict, personal stake, seeded side quests) with the milestone graph | 7 |
-| Content tables (enemy templates, consumables, talents, prices, item properties and drawbacks); how they are made is decided in the phase that first needs each | 5-8 |
+| Content tables (enemy templates, consumables, prices, item properties and drawbacks; talents are done); how they are made is decided in the phase that first needs each | 6-8 |
 | Milestone graph with 3 leads per milestone, quest flags, quest focus, side quests | 7 |
 | Threat clock with warning signs, code-owned day and time of day | 7 |
 | Custom action classification and consequence-based responses | 7 |
@@ -109,7 +105,7 @@ Done (Phases 1-4): story loop and options, rules engine (dice, HP, XP, gear, loo
 | Text map and Travel, rest with random events, generic buttons, journal, Codex | 8 |
 | New game flow, export/import | 8 |
 | Merchants and shops, difficulty setting, "never include" field | 8 |
-| Recap on return, streaming narration | 8 |
+| Recap on return, streaming narration, rest refreshing talents (they use a 10-turn cooldown until then), AI re-skin of talent flavor | 8 |
 | Location secrets, hall of fallen heroes, text size setting and first-time tips | 8 |
 
 If the loop is not fun at this size, extras will not fix it. (Most rows came from the RPG practice reviews after Phase 4, gaps Q-AV in `RESEARCH.md`.)
@@ -125,7 +121,7 @@ If the loop is not fun at this size, extras will not fix it. (Most rows came fro
 ## Screens (phone-first, thumb-reachable)
 
 - **Story:** narration on top, option buttons pinned at the bottom. Dice results shown for every check (roll, modifier, difficulty, result).
-- **Character:** stats, HP, XP/level, equipment, inventory, conditions (designed in the Character phase).
+- **Character (done in Phase 5, More → Character):** name, background, level, alignment label, HP and XP bar, the four stats, drive and flaw, talents with Use buttons, equipment, pack slots with Drop buttons, conditions, and the waiting level-up choice. Character creation (More → Server → New game) uses the same panel area.
 - **Journal:** main quest progress, side quests, focused quest, past scene history.
 - **New game:** "never include" list, difficulty, character creation (the world is fixed in v1).
 - **Hall of fallen heroes:** past characters with level, turns survived, cause of death (or ending) and their epilogue. No AI cost.
@@ -138,7 +134,7 @@ Look around, Talk to someone, Travel, Rest, Check inventory, Wildcard (random ev
 
 ## World core and generated region
 
-- **World core (Phase 5):** written once (Claude drafts, I approve), stored in the code as static text in the cached prompt prefix. The AI must never contradict it; it is the frame for everything the AI invents. It also anchors the v2 mythic paths (angels need a heaven, liches need death magic).
+- **World core (done in Phase 5, `worker/src/world.js`):** written once (Claude drafted, I approved), stored in the code as static text in the cached prompt prefix. The AI must never contradict it; it is the frame for everything the AI invents. It also anchors the v2 mythic paths (angels need a heaven, liches need death magic).
 - **Region generation (Phase 7, called by New game in Phase 8):** one larger AI call at game start returns structured data, validated by code like a turn: places with connections (code rolls their danger), local factions with goals, 4-6 key NPCs with profiles, the central conflict, and the milestone graph with leads, branching finale and threat clock. Everything goes into the ledger before turn 1, so retrieval finds it from the start. Cost about $0.05-0.10 once per game.
 - **Personal stake:** character creation picks a background and a drive; region generation must give the character a personal stake in the central conflict (a debt, a missing sibling, a stolen inheritance), and the opening scene starts from it.
 - **Region bounds:** the region is the map. The AI may add a few places inside it (capped, e.g. 4 more); far places from the world core are named but out of reach in this story.
@@ -178,23 +174,23 @@ The Custom action button invites the AI to say yes to everything. Handle it expl
 
 ## Rules (code owns every number)
 
-- 3 stats, d20 + stat vs. a difficulty, HP, XP and levels, equipment with stats (damage, multiplier, defense). Stats, numbers and level-ups get revisited in the Character phase.
-- **Three results** per check: success (total >= difficulty), success at a cost (missed by 1-2: you get it, but something is lost, damaged or complicated), failure (the story still moves forward). Natural 20 always succeeds well, natural 1 always fails badly. Code picks the result; the AI must narrate exactly that result.
+- 4 stats (Might, Wits, Charm, Grit), d20 + stat (+1 for matching gear, plus talent bonuses, -1 while Wounded) vs. a difficulty, HP, XP and levels, equipment with stats (damage, multiplier, defense). Numbers are in `worker/src/rules.js` and `content.js`; combat (Phase 6) gets its own use for each stat on top of these.
+- **Three results** per check (done): success (total >= difficulty), success at a cost (missed by 1-2: you get it, but something is lost, damaged or complicated), failure (the story still moves forward). Natural 20 always succeeds well, natural 1 always fails badly. Code picks the result; the AI must narrate exactly that result.
 - **Time:** code owns the day number and time of day (morning, afternoon, evening, night). Travel, rest and some actions advance it; the prompt shows it every turn, so the AI does not invent dates.
-- **Morality (alignment):** two hidden numbers, Law-Chaos and Good-Evil, each moving on its own (a grid, not a wheel, so a lawful deed never drags you toward good). The starting alignment is chosen at character creation. Only choices with real moral weight move it: the AI proposes a shift with a reason, code allows a small step per turn and decides the label (e.g. Lawful Neutral) from thresholds. Option text never shows the moral direction. The Character screen shows the label, and a short in-world note appears only when the label changes ("Word of your mercy spreads"); numbers stay hidden so it cannot be played as a score. Effects: NPC first reactions and attitude, the tone of the narration, and options that fit who the character is. Nothing is locked by alignment.
-- **Item slots:** the pack holds a fixed number of slots (e.g. 10 + Grit; exact formula in Phase 5). Big items (armor, two-handed weapons) take 2, coins and small items stack. Over the limit, the player must drop something before moving on.
+- **Morality (alignment):** two hidden numbers, Law-Chaos and Good-Evil, each moving on its own (a grid, not a wheel, so a lawful deed never drags you toward good). The starting alignment is chosen at character creation. Only choices with real moral weight move it: the AI proposes a shift with a reason, code allows a small step per turn and decides the label (e.g. Lawful Neutral) from thresholds. Option text never shows the moral direction. The Character screen shows the label, and a short in-world note appears only when the label changes ("Word of your mercy spreads"); numbers stay hidden so it cannot be played as a score. Effects: NPC first reactions and attitude, the tone of the narration, and options that fit who the character is. Nothing is locked by alignment. Done in Phase 5: two numbers per axis (-12..12) set by two creation questions (lawful/neutral/chaotic, good/neutral/evil start at +-4), the AI proposes `law` or `good` +-1 in state_changes, code allows one step per axis per turn, a side is shown from +-3 (labels like "Lawful Neutral", "True Neutral"), and a short in-world note appears when a side changes. The reactions (NPCs, world) come in Phase 7.
+- **Item slots (done):** the pack holds 10 + Grit slots (+2 with Pack Mule). Worn gear is free; big items (heavy armor, polearms) take 2; coins take none; small items stack 10 to a slot. When the pack is full, new loot is left behind with a note and the player drops something on the Character screen. (Blocking travel until the pack fits comes with Travel in Phase 8.)
 - **Economy:** coins buy and sell at merchants (NPCs or locations flagged as shops). Prices come from a code table by item kind and rarity, adjusted by NPC attitude; selling pays a fraction. The AI names wares and haggles in the story, but never sets a number.
 - **Difficulty:** Story / Normal / Hard at New game. It shifts the difficulty band, enemy strength and how forgiving the defeat branch is. Stored per save.
 - **NPC attitude:** each NPC has an attitude from -2 (hostile) to +2 (friendly). The AI proposes changes, code allows at most 1 step per turn, and attitude shifts the difficulty of social checks. A first meeting gets a code-rolled reaction the AI must honor.
 - Code owns all rules and dice. The AI never rolls or changes numbers directly. It proposes, code validates and applies.
-- **Difficulty is clamped by code** to a range based on location danger and the tier of the obstacle, **not on the player's level**, so levelling up really makes you better (the Phase 3 band rises with level and drops a typical success rate from about 65% at level 1 to about 45% at level 10; fix in Phase 5). The AI proposes, code limits. Log the difficulty distribution so drift is visible.
-- **Advantage / disadvantage:** help, the right tool or a friendly NPC lets a check roll two dice and keep the better; bad conditions keep the worse. Both dice are seeded per turn, so this is never a reroll.
-- **Talents:** at some level-ups the player picks an ability (e.g. "Second wind", "Silver tongue") with a code-defined effect, usable in and out of combat. Defined in Phase 5.
-- **No retry without change:** a failed approach cannot simply be repeated; something must change first (new information, a tool, help, a different stat). Code tracks recently failed approaches; the AI does not re-offer them unchanged.
-- **Narrator rules (prompt):** never decide, feel or speak for the character beyond the chosen action; NPCs want things, can refuse, lie and act on their own; no "What do you do?" endings or purple prose; call back to the player's earlier deeds so consequences are visible.
+- **Difficulty (done)** comes from the obstacle's tier and the location's danger, **never from the player's level**, so levelling up really makes you better. The AI names a tier (easy 7, standard 10, hard 13, daunting 16) and code adds the danger (0-2); the AI cannot set a number. The tier and result distribution are counted and shown in More → Prompt so drift is visible.
+- **Advantage / disadvantage (done):** help, the right tool or a friendly NPC lets a check roll two dice and keep the better; bad conditions keep the worse. The AI may flag at most one option a turn with a reason; a talent can also grant advantage on the next check; advantage and disadvantage cancel. Both dice are seeded per turn, so this is never a reroll.
+- **Talents (done):** 12 hand-written talents, three per stat (`content.js`): passive (+1 on checks of one kind, +2 pack slots, +4 max HP, ignore the Wounded penalty) and active (heal a third or a quarter of max HP, clear conditions, advantage on the next check) with a 10-turn cooldown (Rest refreshes them from Phase 8). One is picked at creation from the background's three; the rest at odd levels from 3. Phase 6 maps each effect type to a combat effect.
+- **No retry without change (done):** a failed approach cannot simply be repeated; something must change first (new information, a tool, help, a different stat). Code tracks recently failed options (listed in the prompt, filtered out of new options while 3 remain) until the player moves, gains an item, or 8 turns pass.
+- **Narrator rules (prompt, done):** never decide, feel or speak for the character beyond the chosen action; NPCs want things, can refuse, lie and act on their own; no "What do you do?" endings or purple prose; call back to the player's earlier deeds so consequences are visible.
 - **NPC profiles:** each named NPC gets a want, a fear, a secret and a voice or quirk, stored in the ledger and shown when the NPC is relevant, so they act consistently and sound different. The secret is revealed only through play.
 - Loot comes from code tables. The AI only names and describes items. Rare **unique items** have a code-defined property and sometimes a drawback (a blade that cannot be put down, armor that slows travel) instead of only bigger numbers.
-- Option text stays neutral. Each option carries a suggested stat and difficulty internally, but the player sees no risk or reward hints.
+- Option text stays neutral. Each option carries a suggested stat, a difficulty tier and an optional edge (with a reason) internally, but the player sees no risk or reward hints; the dice box shows the roll, difficulty, advantage and result afterwards.
 - Every check shows its roll, modifier, difficulty and result.
 
 ## Combat (inspired by "Just Loot")
@@ -247,9 +243,9 @@ Every phase that adds a section must fit it into the budget (rebalancing the oth
 
 **AI output per turn (JSON, validated before applying):**
 - narration
-- options (each with suggested stat and difficulty; must vary in kind, e.g. at least one social, one exploratory, one direct, without hinting at risk)
+- options (each with suggested stat, difficulty tier and optional edge; must vary in kind, e.g. at least one social, one exploratory, one direct, without hinting at risk)
 - action classification (for custom actions)
-- state_changes (proposed, validated by code; later also alignment shifts, NPC attitude changes and time passing)
+- state_changes (proposed, validated by code; alignment shifts are in since Phase 5, NPC attitude changes and time passing come later)
 - new_facts (every named thing the AI invented this turn, with `was` for renamed entities)
 - quest_flags and revealed leads
 
@@ -275,8 +271,8 @@ Every phase that adds a section must fit it into the budget (rebalancing the oth
 2. **Backend and schema:** protected proxy (Cloudflare Worker or Vercel function), spend cap, server-side save, memory schema (state, summary, ledger, milestone graph). One real AI turn, JSON validation with retry, the turn writes to the ledger.
 3. **Rules engine:** dice, HP, XP and levels, equipment, loot tables, difficulty clamps, visible dice, state persistence. Start with a small read-only Ledger view in the More sheet (entities and their facts, no AI call) so the memory can be checked while playing.
 4. **Retrieval and prompt assembly:** token budget per section, rolling summary, ledger retrieval, last-N turns, option variety, prompt caching of the static prefix, debug view of the assembled prompt.
-5. **Character:** character creation (content decided in depth at the start of the phase), the stat system and what each stat does, numbers and difficulty scale, level-ups and XP pace, three-result checks, advantage/disadvantage, talents, difficulty no longer tied to level, no retry without change, narrator rules, morality axes (starting alignment, shifts, label), item slots, Character screen. Works through the "Character progression review" below, with XP pace sized for a 150-250 turn game. Housekeeping first: write the world core (Claude drafts, I approve) and replace the old "gritty, almost no magic" world text with it, split `app.js` into a few plain files (no build step), add the automated end-to-end test (a 30-turn run of the Worker against the mock) to `npm test`, and add the keep-a-copy-before-migrating step for saves. Comes before combat so combat is built on the final stats.
-6. **Combat:** (the defeat branch's "rescued by a friendly NPC" and threat-clock costs are hooked up in Phase 7, once NPC attitude and the clock exist) code-resolved rounds, enemy tables with roles and visible intent, status effects, item effects, unique items, item prices (designed with gear), flee/surrender and morale, danger shown before fights and in the header, combat log, one AI summary call, defeat branch at 0 HP, permanent death and epilogue.
+5. **Character (done, awaiting the phone checklist):** housekeeping first (world core written and approved, `app.js` split into `ui.js`, `panels.js`, `character.js` and `app.js`, the 30-turn end-to-end test against the mock in `npm test`, saves copied to `bak:main:v<old>` before migrating), then the Known issues (difficulty tiers, three results, facts policy with cap and merge pass, pacing rule, single XP note, a truer Prompt estimate), then the character: pick-list creation (name, background, drive, flaw, two alignment questions, 2 free points, starting talent), 4 stats, XP table and level-up picks, 12 talents, advantage/disadvantage, alignment axes, item slots, no retry without change, narrator rules and the Character screen (More → Character). Schema v4.
+6. **Combat:** (each talent effect type from `content.js` needs a combat meaning, and each stat a use in combat; the defeat branch's "rescued by a friendly NPC" and threat-clock costs are hooked up in Phase 7, once NPC attitude and the clock exist) code-resolved rounds, enemy tables with roles and visible intent, status effects, item effects, unique items, item prices (designed with gear), flee/surrender and morale, danger shown before fights and in the header, combat log, one AI summary call, defeat branch at 0 HP, permanent death and epilogue.
 7. **Quest structure:** region generation at game start (places, factions, key NPCs, conflict) inside the world core, milestone graph generation with 3 leads per milestone, threat clock with warning signs, day and time of day, NPC attitude and first-meeting reactions (shaped by alignment), NPC profiles, branching finale, epilogue built from choices, quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
 8. **Map and polish:** text map and Travel (with danger and time), rest with random events, generic buttons, journal, Codex (known NPCs, places, factions, items with their facts; edit and delete), new game flow (no setting choice in v1) with the "never include" field and difficulty setting, merchants and shops, location secrets, hall of fallen heroes, text size setting and first-time tips, recap on return, streaming narration, export/import, home screen icon.
 9. **Tuning:** bot-played test runs of 100+ turns logging tokens per turn, contradictions against the ledger, option repetition and difficulty distribution. Try a cheaper model. Add regenerate-with-fixed-dice; tune the threat clock if the loop feels too safe.
@@ -307,17 +303,17 @@ Runtime models for the game itself are a separate question (see Open questions a
 
 (Regenerate with fixed dice and the bot-played tests are part of Phase 9.)
 
-## Character progression review (input for Phase 5 Character)
+## Character progression review (done in Phase 5; balance with bot-play data in Phase 9)
 
-Phase 3 shipped a first guess: 3 stats at +0..+2, +1 to the lowest stat per level, 20 XP per level, level cap 10, stats only add to d20 rolls (plus a +1 gear bonus). Revisit in Phase 5 (Character), then balance with bot-play data in Phase 9:
-- Revise the starting stats and the size of the numbers (maybe larger values than +0..+2, with the difficulty band scaled to match).
-- Let the player choose which stat gets the level-up point (now automatic).
-- Bot-play XP and level-ups to balance pace: XP per roll, XP per level, how many turns a level takes.
-- Revisit the max level (now 10) and what happens at the cap.
-- Show XP gained in one note per turn (roll XP and the AI's bonus XP are separate lines now, e.g. "+3 XP" then "+2 XP"). Small UI fix, fits Phase 5.
-- Difficulty must stop rising with level (see Rules); check that a level-10 character succeeds more often than a level-1 one in the same place.
-- XP for finishing quests and milestones, not only for rolls (Ironsworn gives XP for completed vows). Decide the split between roll XP, AI bonus XP and quest XP.
-- Decide what each stat should actually do. Now: might, wits and grit only add to rolls, and combat (Phase 6) will need its own use for them.
+Phase 3 shipped a first guess (3 stats at +0..+2, +1 to the lowest stat per level, 20 XP per level). Phase 5 decided:
+- **Stats and numbers:** four stats, a background spread of +3/+2/+1/0 plus 2 free points; a typical stat grows from about +3 to +8 by level 10. Difficulty tiers 7/10/13/16 do not move with level.
+- **Level-up choice:** the player picks (even levels a stat, odd levels from 3 a talent), no automatic stat gain.
+- **XP pace:** about 2.2 XP a turn from rolls and bonuses (2 per roll, 1 per failure or no roll, 1-3 AI bonus), plus 25 per milestone and 10 per side quest from Phase 7. The table (40, 100, 190, 310, 460, 640, 860, 1120, 1420) puts level 2 near turn 16 and levels 6-8 at about turn 150-250 with quest XP. Re-check with bot-play in Phase 9.
+- **Cap:** level 10; XP stops counting there and the Character screen says "top level".
+- **XP notes:** one note a turn.
+- **Level and difficulty:** checked in tests: the same check succeeds more often at +8 than at +4 (`rules.test.js`).
+- **Quest XP:** the split is decided (above); `awardQuestXp` in `rules.js` is what the Phase 7 quest code calls.
+- **What each stat does:** Might, Wits, Charm and Grit each add to their checks; Grit also sets HP and pack slots; combat (Phase 6) adds its own use for the others.
 
 ## Later (not in v1)
 
@@ -340,6 +336,7 @@ Written down so it is not forgotten. Not part of v1 (scope freeze); build after 
 
 - **v2: Setting choice** at New game (cyberpunk, pirates, ...). Each setting needs its own flavor of the code tables (gear, enemies, loot names, prices) and of the mythic paths; the rules engine stays the same.
 - **Companions:** each needs a ledger record, stats, combat participation and an AI voice, so more context per turn and more rules. Design the memory schema so it does not block them, but do not build them first.
+- AI re-skin of the 12 talents' names and flavor per game (Phase 8 at the earliest; the numbers stay in code)
 - Full camp scene with its own options
 - Drawn map
 - Item pictures
@@ -354,9 +351,8 @@ Written down so it is not forgotten. Not part of v1 (scope freeze); build after 
 
 ## Open questions
 
-- Content tables: hand-written, AI-generated within code limits, or a mix (numbers by hand, flavor by AI)? Revisit at the start of each phase that needs a table (talents in 5, enemies, consumables and items in 6, prices in 8).
+- Content tables: numbers by hand (decided for talents in Phase 5, flavor by AI later). Revisit at the start of each phase that needs a table (enemies, consumables and items in 6, prices in 8).
 - Which model for milestone graph generation? (Turns and summaries are decided, see Decisions.)
 - Pacing: how many turns per milestone, and how the game nudges when a milestone drags (Phase 7, with the threat clock).
-- Character creation: decided in depth at the start of Phase 5 (a pick-list of archetype, drive and flaw is one candidate).
 - Is the milestone graph generated once by the AI at game start, or picked from a few hand-written templates per setting?
 - Threat clock details: what ticks it and by how much, and what a full clock does (Phase 7).

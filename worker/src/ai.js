@@ -1,6 +1,8 @@
 // One AI turn: prompt assembly, structured JSON output, validation with retry, safe fallback.
 import Anthropic from "@anthropic-ai/sdk";
-import { STATS, ENTITY_TYPES, OPTION_KINDS, CLASSIFICATIONS, CHANGE_KINDS } from "./schema.js";
+import { STATS, ENTITY_TYPES, OPTION_KINDS, OPTION_TIERS, OPTION_EDGES, CLASSIFICATIONS, CHANGE_KINDS } from "./schema.js";
+import { tierFromNumber } from "./content.js";
+import { activeFailures } from "./rules.js";
 import { norm } from "./ledger.js";
 import { buildPrompt } from "./prompt.js";
 
@@ -35,8 +37,11 @@ export const OUTPUT_SCHEMA = {
       type: "array",
       items: {
         type: "object", additionalProperties: false,
-        required: ["text", "kind", "stat", "difficulty"],
-        properties: { text: str, kind: { type: "string", enum: OPTION_KINDS }, stat: { type: "string", enum: STATS }, difficulty: { type: "integer" } },
+        required: ["text", "kind", "stat", "tier", "edge", "edge_why"],
+        properties: {
+          text: str, kind: { type: "string", enum: OPTION_KINDS }, stat: { type: "string", enum: STATS },
+          tier: { type: "string", enum: OPTION_TIERS }, edge: { type: "string", enum: OPTION_EDGES }, edge_why: str,
+        },
       },
     },
     classification: { type: "string", enum: CLASSIFICATIONS },
@@ -60,6 +65,10 @@ export const OUTPUT_SCHEMA = {
   },
 };
 
+// The schema travels with every request; count it so the Prompt view's estimate is closer to the real input.
+export const SCHEMA_TEXT = JSON.stringify(OUTPUT_SCHEMA);
+export const SCHEMA_TOKENS = Math.ceil(SCHEMA_TEXT.length / 4);
+
 // Check the parsed reply and normalize it. Returns { turn, errors }; errors means retry.
 export function validateTurn(raw, save) {
   const errors = [];
@@ -70,16 +79,23 @@ export function validateTurn(raw, save) {
 
   const seen = new Set();
   const options = [];
+  let edged = false;
   for (const o of Array.isArray(raw.options) ? raw.options : []) {
     const text = String(o?.text || "").trim().slice(0, 120);
     if (!text || seen.has(text.toLowerCase())) continue;
     seen.add(text.toLowerCase());
+    // At most one option a turn carries an edge, and only with a reason; the AI proposes, code limits.
+    let edge = OPTION_EDGES.includes(o.edge) ? o.edge : "none";
+    const edge_why = String(o.edge_why || "").trim().slice(0, 60);
+    if (edge !== "none" && (edged || !edge_why)) edge = "none";
+    if (edge !== "none") edged = true;
     options.push({
       text,
       kind: OPTION_KINDS.includes(o.kind) ? o.kind : "other",
       stat: STATS.includes(o.stat) ? o.stat : "wits",
-      // Placeholder range; Phase 3 clamps by level and location danger.
-      difficulty: Math.min(18, Math.max(6, Math.round(Number(o.difficulty) || 12))),
+      tier: OPTION_TIERS.includes(o.tier) ? o.tier : o.difficulty ? tierFromNumber(Number(o.difficulty)) : "standard",
+      edge,
+      edge_why: edge === "none" ? "" : edge_why,
     });
   }
   if (options.length < 3) errors.push(`need 3 or 4 distinct options, got ${options.length}`);
@@ -109,7 +125,8 @@ function similar(a, b) {
 }
 
 export function varyOptions(save, options) {
-  const recent = [...save.scene.options, ...save.recent.slice(-3).flatMap((t) => t.options)].map((o) => o.text);
+  // Recently offered options and approaches that just failed are not offered again unchanged.
+  const recent = [...save.scene.options, ...save.recent.slice(-3).flatMap((t) => t.options)].map((o) => o.text).concat(activeFailures(save).map((f) => f.text));
   let removable = options.length - 3;
   const kept = options.filter((o) => {
     if (removable > 0 && recent.some((r) => similar(o.text, r))) { removable--; return false; }
@@ -174,10 +191,10 @@ export async function runTurn(env, save, action, dice) {
     let raw;
     try { raw = JSON.parse(text); } catch { lastError = "reply was not valid JSON"; continue; }
     const { turn, errors } = validateTurn(raw, save);
-    if (turn) return { turn, model: res.model || model, usage: total, cost, attempts: attempt, est: est.total };
+    if (turn) return { turn, model: res.model || model, usage: total, cost, attempts: attempt, est: est.total + SCHEMA_TOKENS };
     lastError = errors.join("; ");
   }
-  return { turn: null, model, usage: total, cost, attempts: MAX_ATTEMPTS, error: lastError, est: est.total };
+  return { turn: null, model, usage: total, cost, attempts: MAX_ATTEMPTS, error: lastError, est: est.total + SCHEMA_TOKENS };
 }
 
 // Safe turn when the AI is unavailable: nothing in the save changes, the player sees the same options again.
