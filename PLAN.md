@@ -41,6 +41,7 @@ Background research on existing products and the evidence behind these decisions
   - a **cost report** compares tokens per turn (input, cached, output) and cost with the baseline in Status, and explains any increase; it also checks the save size and the Worker's CPU time per request against the Cloudflare free-plan limits (10 ms CPU per request, 1,000 KV writes a day; we use about 3 writes a turn)
   - README and this plan (including Status) are updated
 - **Playtest notes:** after each phase I play about 20 turns and name 3 things that feel off; they go into Known issues and are weighed at the start of the next phase.
+  - **Playtest log:** More → Playtest log builds a plain-text report of the last 10, 25 or 60 turns (story, the options with their hidden tier and edge, dice, changes, new names per turn, ledger, counters, cost per turn). Tap Copy and paste it into the chat instead of taking screenshots. No AI call.
 
 ## Top design principle: continuity
 

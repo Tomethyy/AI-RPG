@@ -8,7 +8,7 @@
   --accent: #d9a441;
   --good: #7fb069;
   --bad: #d96459;
-  --build: "1.37";
+  --build: "1.41";
   color-scheme: dark;
 }
 
@@ -212,3 +212,6 @@ button:disabled { opacity: 0.4; }
 .options button .tag { white-space: nowrap; font-size: 11.5px; color: var(--muted); }
 /* A waiting level-up choice. */
 .generic button.alert, .sheet button.alert { border-color: var(--accent); color: var(--accent); }
+
+/* Playtest log: the text itself, selectable as a fallback for Copy. */
+.logbox { width: 100%; height: 40vh; margin-top: 8px; padding: 8px; font: 11.5px/1.35 ui-monospace, Menlo, monospace; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }

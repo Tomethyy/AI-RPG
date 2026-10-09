@@ -14,6 +14,7 @@
 //                                 (written in the background by a cheap model into "sum:<game id>", adopted on the next request)
 //   recent: [TurnRecord],         turns not yet summarized plus the newest RECENT_PROMPT, at most RECENT_KEEP
 //   last: { request_id, response } | null,           idempotency: a repeated request gets the stored reply
+//   intro: { cost, narration[], options[] } | absent,  the AI-written opening scene (turn 1 has no turn record)
 //   failed: [{ text, n, loc }],   approaches that failed lately; not offered again unchanged (rules.js recordFailure)
 //   fm: { entity, requested_at } | null,             a background fact merge is running for this entity (factmerge.js)
 //   fallback_log: [{ ts, turn, reason, detail }],    last 5 fallback turns (optional; created on the first fallback)

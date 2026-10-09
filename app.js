@@ -49,11 +49,11 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.37"; // stamped by stamp.py
+const JS_BUILD = "1.41"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Talents", "Travel", "Rest", "Custom"];
-const MORE = ["Character", "Ledger", "Prompt", "Wildcard"];
-const PANELS = new Set(["Character", "Ledger", "Prompt"]); // open inside the More sheet
+const MORE = ["Character", "Ledger", "Prompt", "Playtest log", "Wildcard"];
+const PANELS = new Set(["Character", "Ledger", "Prompt", "Playtest log"]); // open inside the More sheet
 let turnIndex = 0;
 
 function renderTurn(index, chosenText) {
@@ -208,6 +208,7 @@ function useGeneric(label) {
   if (label === "Character") { openCharacter(); return; }
   if (label === "Ledger") { openLedger(); return; }
   if (label === "Prompt") { openPrompt(); return; }
+  if (label === "Playtest log") { openPlaytest(25); return; }
   if (label === "Talents") { openTalents(); return; }
   if (label === "Custom") { openCustom(); return; }
   addNote(`[${label}] is not wired up yet.`);

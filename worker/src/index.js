@@ -8,6 +8,7 @@ import { adoptFactMerge, mergeDue, mergeJob, runFactMerge } from "./factmerge.js
 import { rollOption, applyChanges, logDifficulty, consumeEdge, recordFailure, clearFailures, applyPick, useTalent, dropItem } from "./rules.js";
 import { validateCharacter, DEFAULT_CHARACTER } from "./character.js";
 import { creationTables } from "./content.js";
+import { playtestReport, archiveKeys, PLAYTEST_MAX } from "./playtest.js";
 
 const SERVER_VERSION = 1;
 const MAX_BODY = 4096; // bytes; a turn request is a few hundred
@@ -213,7 +214,7 @@ async function writeIntro(env, save) {
   save.scene = { location_id: save.scene.location_id, narration: t.narration, options: t.options };
   applyNewFacts(save, t.new_facts, 1);
   save.summary.text = fit(t.narration.join(" "), BUDGET.summary);
-  save.intro = { cost: r.cost };
+  save.intro = { cost: r.cost, narration: t.narration, options: t.options }; // kept for the playtest report; turn 1 has no record
 }
 
 // Character screen actions (no AI call): pick a level-up reward, use a talent, drop an item.
@@ -230,6 +231,18 @@ async function handleChar(request, env) {
   if (!r.ok) return json({ error: r.error, state: await stateWithSpend(env, save) }, 409);
   await storeSave(env, save);
   return json({ events: r.events, state: await stateWithSpend(env, save) });
+}
+
+// Playtest report (More → Playtest log): the last turns, the hidden option tiers, the ledger, as text to paste into a chat. No AI call.
+async function handlePlaytest(url, env) {
+  const save = (await loadSave(env)) || newGame(SLOT);
+  const last = Math.max(1, Math.min(PLAYTEST_MAX, parseInt(url.searchParams.get("last"), 10) || 25));
+  const { keys } = archiveKeys(save, last);
+  const records = [...save.recent];
+  for (const k of keys) records.push(...((await env.GAME.get(k, "json")) || []));
+  const spend = { today: Math.round((await getSpend(env)) * 10000) / 10000, cap: capUSD(env) };
+  const r = playtestReport(save, records, last, { spend });
+  return json({ text: r.text, turns: r.turns, bytes: r.text.length, last, max: PLAYTEST_MAX });
 }
 
 // Debug view: the prompt the next turn would send (for an example action), section by section, plus the last turn's real usage.
@@ -286,6 +299,7 @@ async function route(request, env, ctx) {
     return json(ledgerView(save));
   }
   if (pathname === "/api/prompt" && request.method === "GET") return handlePrompt(env);
+  if (pathname === "/api/playtest" && request.method === "GET") return handlePlaytest(new URL(request.url), env);
   if (pathname === "/api/creation" && request.method === "GET") return json(creationTables());
   if (pathname === "/api/char" && request.method === "POST") return handleChar(request, env);
   if (pathname === "/api/turn" && request.method === "POST") return handleTurn(request, env, ctx);

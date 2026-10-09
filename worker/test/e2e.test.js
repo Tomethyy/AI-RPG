@@ -168,6 +168,24 @@ test("a 30-turn game: creation, turns, level-ups, talents, fact merge, summaries
   assert.ok(Object.keys(save.counters.tiers).length >= 2);
   assert.ok(save.pc === undefined && save.actors.pc.stats.charm >= 1);
 
+  // the playtest report: pasteable text with the hidden tiers, dice, ledger and new names
+  const rep = (await call(env, "GET", "/api/playtest?last=8")).data;
+  assert.equal(rep.turns, 8);
+  assert.match(rep.text, /^PLAYTEST REPORT/);
+  assert.match(rep.text, /## Turn 31 /);
+  assert.ok(!rep.text.includes("## Turn 22 "));
+  assert.match(rep.text, /Player \(option\): .* \[(social|explore|direct|cautious), (might|wits|charm|grit), (easy|standard|hard|daunting)/);
+  assert.match(rep.text, /Dice: d20 \d+/);
+  assert.match(rep.text, /OPENING SCENE/);
+  assert.match(rep.text, /LEDGER \(what the app remembers\)/);
+  assert.match(rep.text, /Maren \(npc/);
+  const full = (await call(env, "GET", "/api/playtest?last=999")).data;
+  assert.equal(full.last, full.max);
+  assert.ok(full.turns >= 30 && full.turns <= full.max);
+  assert.ok(full.bytes < 150_000, `report is ${full.bytes} bytes`);
+  assert.match(full.text, /## Turn 2 /); // the first archived turn is there
+  console.log(`# playtest report: ${rep.bytes} chars for 8 turns, ${full.bytes} chars for ${full.turns} turns`);
+
   // costs of the run, printed for the cost report
   const sizeKB = Buffer.byteLength(kv.raw("save:main")) / 1024;
   const writes = (kv.writes - writes0) / 30;

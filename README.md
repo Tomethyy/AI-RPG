@@ -20,7 +20,7 @@ Seeded d20 (one die per game+turn, a second for advantage or disadvantage, so re
 three results (success, success at a cost, failure), four stats, XP table and level-up picks, talents, item slots, alignment axes,
 failed approaches that are not offered again unchanged, validation of the AI's proposed state changes. Character creation is validated in
 `worker/src/character.js`; `GET /api/creation` serves the pick-lists, `POST /api/new` with a `character` starts a game, `POST /api/char` picks level-ups,
-uses talents and drops items. More → Ledger shows the memory read-only (`GET /api/ledger`).
+uses talents and drops items. More → Ledger shows the memory read-only (`GET /api/ledger`). More → Playtest log (`GET /api/playtest?last=N`, `worker/src/playtest.js`) builds a copy-and-paste text report of the last turns for review in a chat.
 
 Prompt (Phase 4) lives in `worker/src/prompt.js`: a token budget per section keeps every turn at roughly the same size
 however long the campaign runs. Rules, the world core and the tone are a cached system prefix; summary and quest are a second cached block.

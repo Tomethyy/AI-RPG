@@ -150,3 +150,40 @@ async function openPrompt() {
     body.replaceChildren(el("p", "note", "Couldn't reach the server."));
   }
 }
+
+// ---- Playtest log (the story, options with their hidden tiers, dice and ledger as text to copy into a chat; no AI call) ----
+async function openPlaytest(last) {
+  const body = $("ledgerBody");
+  body.replaceChildren(el("p", "note", "Loading…"));
+  showPanel(true);
+  if (!online()) { body.replaceChildren(el("p", "note", "The log is built on the server. Go back and connect a server first.")); return; }
+  try {
+    const { status, data } = await api(`/api/playtest?last=${last}`);
+    if (status !== 200) { body.replaceChildren(el("p", "note", `Couldn't load the log (${status}).`)); return; }
+    body.replaceChildren();
+    body.append(el("p", "note", `${data.turns} turns, ${Math.round(data.bytes / 1024)} KB. Tap Copy, then paste it into the chat.`));
+    const area = el("textarea", "logbox");
+    area.readOnly = true;
+    area.value = data.text;
+    const copy = el("button", "mini", "Copy");
+    copy.type = "button";
+    copy.addEventListener("click", async () => {
+      let ok = false;
+      try { await navigator.clipboard.writeText(data.text); ok = true; } catch {}
+      if (!ok) { area.focus(); area.select(); area.setSelectionRange(0, data.text.length); try { ok = document.execCommand("copy"); } catch {} }
+      copy.textContent = ok ? "Copied" : "Select all and copy by hand";
+    });
+    const row = el("div", "name-row");
+    row.append(copy);
+    for (const n of [10, 25, data.max]) {
+      if (n === last) continue;
+      const b = el("button", "mini ghost", `Last ${n}`);
+      b.type = "button";
+      b.addEventListener("click", () => openPlaytest(n));
+      row.append(b);
+    }
+    body.append(row, area);
+  } catch {
+    body.replaceChildren(el("p", "note", "Couldn't reach the server."));
+  }
+}
