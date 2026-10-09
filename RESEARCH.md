@@ -102,6 +102,9 @@ Established techniques from human-run and solo games that address problems this 
 - Wrath of the Righteous players complain that the wheel lets one-axis choices drag them toward a neighboring alignment (consistently lawful choices drifting to neutral good), and that alignment drift could lock them out of their class.
 - **For us:** two independent axes (a grid, not a wheel), hidden numbers, a label shown on the Character screen, a short note only when the label changes, never a moral hint in option text, and effects through the world (reactions, attitude, tone, fitting options) rather than locks.
 
+### Standard CRPG features (checklist pass)
+A second pass compared the plan with the usual RPG feature list rather than with known problems (the first pass missed alignment that way). Covered already: character creation, stats, levels and XP, gear and loot, conditions, rest and healing, quest log, map and travel, companions (Later). Missing and now added: an economy (merchants, prices, selling; without it coins and spare loot are worthless), inventory limits (item slots in the style of Knave, where slots depend on a stat and big items take more), and a difficulty setting at New game, which most CRPGs offer.
+
 ### Table practices
 - Session zero and safety tools (lines: never include; veils: happens off-screen) are standard at the start of a campaign. For a solo AI game this is a "never include" field at New game, stored with the setting (it lives in the cached prefix, so it costs nothing per turn).
 - A "previously on" recap at the start of a session is standard GM practice and helps a phone player who returns after days. We already store the rolling summary, so it needs no AI call.
@@ -123,7 +126,7 @@ Established techniques from human-run and solo games that address problems this 
 
 Priority: **Foundation** means v1 would feel broken or be unsafe without it. **Should** means clearly valuable. **Later** is optional.
 
-Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later. Q-AF came from the review after Phase 4; their status shows what was accepted. Character creation got its own phase (5) before combat.
+Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later. Q-AI came from the review after Phase 4; their status shows what was accepted. Character creation got its own phase (5) before combat.
 
 | # | Gap | Why it matters (evidence) | Fix | Priority | Status in PLAN.md |
 |---|---|---|---|---|---|
@@ -157,6 +160,9 @@ Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under 
 | AB | No content boundaries | Session zero, lines and veils | "Never include" field at New game, in the cached prefix | Should | Accepted, Phase 8 |
 | AE | XP only for rolls | Ironsworn XP for completed vows | XP for finishing quests and milestones | Should | Phase 5 progression review |
 | AF | Factions are static | Blades in the Dark faction clocks | Small clocks per faction, advanced by code | Later | Later |
+| AG | Coins and spare loot have no use | Shops are standard in nearly every RPG | Merchants, code price table, selling at a fraction | Should | Accepted, prices Phase 6, shops Phase 8 |
+| AH | Inventory has no limit | Knave-style item slots | Slots from a stat, big items take 2 | Should | Accepted, Phase 5 |
+| AI | One difficulty for everyone | Standard CRPG setting | Story / Normal / Hard at New game | Should | Accepted, Phase 8 |
 | AD | No sense of who the character has become | D&D alignment; morality meter research | Two hidden axes, label on change, world reacts, nothing locked | Should | Accepted, Phase 5 (axes) and Phase 7 (reactions) |
 | AC | Plan items with no phase | Everweave latency complaints | Streaming narration; better model for milestone and finale turns | Should | Streaming: Phase 8. Key-scene model: Later |
 
