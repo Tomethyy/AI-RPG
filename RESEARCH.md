@@ -96,6 +96,12 @@ Established techniques from human-run and solo games that address problems this 
 - No source covers time-of-day tracking specifically, but in our own play the AI already makes time claims ("burned four nights ago", "until the month turns"). Without a code-owned day counter these will drift and contradict each other.
 - **For us:** a small code-owned attitude per NPC (-2..+2, changed by at most 1 per turn, shifting social difficulty) and a code-owned clock (day number plus time of day, advanced by travel and rest) are cheap state that the prompt can show every turn.
 
+### Morality systems (CRPG alignment and morality meters)
+- D&D alignment is a 3x3 grid (Law-Chaos, Good-Evil). CRPGs turned it into meters: KOTOR light/dark side points, Mass Effect Paragon/Renegade, Fallout karma, Pathfinder: Wrath of the Righteous's alignment wheel. Baldur's Gate 3 deliberately tracks no alignment.
+- Known problems: meters turn morality into a score to optimize, judge choices by a hidden metric that can contradict the player's own sense, and often have no visible effect on the story (GamesBeat on Mass Effect). A 2022 Games and Culture study found players use intuitive meters more as a moral guide than as a score; a 2024 DiGRA paper cites the argument that the problem comes from making the numbers too obvious, and that hidden shifts revealed afterwards work better.
+- Wrath of the Righteous players complain that the wheel lets one-axis choices drag them toward a neighboring alignment (consistently lawful choices drifting to neutral good), and that alignment drift could lock them out of their class.
+- **For us:** two independent axes (a grid, not a wheel), hidden numbers, a label shown on the Character screen, a short note only when the label changes, never a moral hint in option text, and effects through the world (reactions, attitude, tone, fitting options) rather than locks.
+
 ### Table practices
 - Session zero and safety tools (lines: never include; veils: happens off-screen) are standard at the start of a campaign. For a solo AI game this is a "never include" field at New game, stored with the setting (it lives in the cached prefix, so it costs nothing per turn).
 - A "previously on" recap at the start of a session is standard GM practice and helps a phone player who returns after days. We already store the rolling summary, so it needs no AI call.
@@ -117,7 +123,7 @@ Established techniques from human-run and solo games that address problems this 
 
 Priority: **Foundation** means v1 would feel broken or be unsafe without it. **Should** means clearly valuable. **Later** is optional.
 
-Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later. Q-AC came from the review after Phase 4; their status shows what was accepted. Character creation got its own phase (5) before combat.
+Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under "Should have". N-P are in Later. Q-AD came from the review after Phase 4; their status shows what was accepted. Character creation got its own phase (5) before combat.
 
 | # | Gap | Why it matters (evidence) | Fix | Priority | Status in PLAN.md |
 |---|---|---|---|---|---|
@@ -149,6 +155,7 @@ Status: gaps A-G were accepted into v1 in `PLAN.md`. H-M are listed there under 
 | Z | The player has no say over luck | Ironsworn momentum, Fate points | Small luck resource: earned on failures, spent for +2 after a roll | Later or Should | Later |
 | AA | Coming back after days is disorienting | "Previously on" recap | Recap screen from the stored summary, no AI call | Should | Accepted, Phase 8 |
 | AB | No content boundaries | Session zero, lines and veils | "Never include" field at New game, in the cached prefix | Should | Accepted, Phase 8 |
+| AD | No sense of who the character has become | D&D alignment; morality meter research | Two hidden axes, label on change, world reacts, nothing locked | Should | Accepted, Phase 5 (axes) and Phase 7 (reactions) |
 | AC | Plan items with no phase | Everweave latency complaints | Streaming narration; better model for milestone and finale turns | Should | Streaming: Phase 8. Key-scene model: Later |
 
 Biggest hole was A. "Main quest with an ending" is a promise the AI cannot keep on its own.
@@ -174,4 +181,5 @@ Biggest hole was A. "Main quest with an ending" is a promise the AI cannot keep 
 - OSR morale and reactions: DMDavid, "Morale checks"; The Alexandrian on reactions; referee screen notes (git.itsericwoodward.com)
 - Roguelike permadeath: Game Developer, "The game design lessons of permadeath"; r/roguelikedev FAQ Friday #19 (Cogmind); Bugnet, "How to make a roguelike feel fair"; Blade RPG, "One life"
 - PAYADOR (arxiv.org/abs/2504.07304); "World-State Transformations for Neuro-symbolic Interactive Storytelling" (arXiv 2605.24719); "AI Agent Systems" survey (arXiv 2601.01743); Kumyol, "NarrativeWorlds" (HKUST, 2026)
+- Morality systems: The Artifice, "Morality systems in role-playing games"; Formosa et al., "Morality meters and their impacts on moral choices in videogames" (Games and Culture, 2022; philarchive.org/rec/FORMMA-4); Sarian, DiGRAA 2024 paper (digraa.org); GamesBeat, "Morality metrics in video games"; PC Gamer, "Why math is strangling videogame morality"; Steam discussions on Pathfinder: Wrath of the Righteous alignment (player reports)
 - 2026 apps: Auferet (peerpush.com/p/auferet, toolradar.com), Eidolon Engine (Gumroad listing), Jenova articles (vendor), Converge, "Best AI text adventure games 2026"

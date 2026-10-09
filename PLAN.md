@@ -38,6 +38,7 @@ Background research on existing products and the evidence behind these decisions
 | Progression | XP, levels, equipment with stats, loot from code tables. Reworked in the Character phase (5) |
 | Check results | Three results: success, success at a cost (missed by 1-2), failure; natural 1 and 20 are special. Code decides the band, the AI narrates it |
 | Pressure | Threat clock on the main quest with visible warning signs, plus a code-owned day and time of day |
+| Morality | Two independent hidden axes (Law-Chaos, Good-Evil), shown as a label like "Chaotic Good". Deeds shift it; the world reacts to it; nothing gets locked |
 | Fair death | Every fight offers flee or surrender, enemies have morale, danger is shown before a fight, location danger is visible |
 | Scope | v1 is frozen (see below). Everything else goes in Later. |
 | Backend | Cloudflare Worker + KV, deployed from GitHub (Workers Builds). Shared game key, $1/day spend cap (DAILY_CAP_USD) |
@@ -52,6 +53,7 @@ Background research on existing products and the evidence behind these decisions
 - Main quest as a milestone graph with 3 leads per milestone, quest focus, side quests
 - Threat clock with warning signs, code-owned day and time of day
 - NPC attitude tracked by code
+- Two-axis morality (alignment) that deeds shift and the world reacts to
 - Policy for off-path custom actions (consequences, not refusals)
 - Rules engine with XP, levels, equipment and loot, clamped difficulty, visible dice
 - Code-resolved combat with one AI summary, permanent death, flee/surrender, enemy morale, code enemy tables, item effects
@@ -116,6 +118,7 @@ The Custom action button invites the AI to say yes to everything. Handle it expl
 - 3 stats, d20 + stat vs. a difficulty, HP, XP and levels, equipment with stats (damage, multiplier, defense). Stats, numbers and level-ups get revisited in the Character phase.
 - **Three results** per check: success (total >= difficulty), success at a cost (missed by 1-2: you get it, but something is lost, damaged or complicated), failure (the story still moves forward). Natural 20 always succeeds well, natural 1 always fails badly. Code picks the result; the AI must narrate exactly that result.
 - **Time:** code owns the day number and time of day (morning, afternoon, evening, night). Travel, rest and some actions advance it; the prompt shows it every turn, so the AI does not invent dates.
+- **Morality (alignment):** two hidden numbers, Law-Chaos and Good-Evil, each moving on its own (a grid, not a wheel, so a lawful deed never drags you toward good). The starting alignment is chosen at character creation. Only choices with real moral weight move it: the AI proposes a shift with a reason, code allows a small step per turn and decides the label (e.g. Lawful Neutral) from thresholds. Option text never shows the moral direction. The Character screen shows the label, and a short in-world note appears only when the label changes ("Word of your mercy spreads"); numbers stay hidden so it cannot be played as a score. Effects: NPC first reactions and attitude, the tone of the narration, and options that fit who the character is. Nothing is locked by alignment.
 - **NPC attitude:** each NPC has an attitude from -2 (hostile) to +2 (friendly). The AI proposes changes, code allows at most 1 step per turn, and attitude shifts the difficulty of social checks. A first meeting gets a code-rolled reaction the AI must honor.
 - Code owns all rules and dice. The AI never rolls or changes numbers directly. It proposes, code validates and applies.
 - **Difficulty is clamped by code** to a range based on level and location danger. The AI proposes, code limits. Log the difficulty distribution so drift is visible.
@@ -197,9 +200,9 @@ The AI has no memory. The app stores everything and rebuilds a compact prompt ev
 2. **Backend and schema:** protected proxy (Cloudflare Worker or Vercel function), spend cap, server-side save, memory schema (state, summary, ledger, milestone graph). One real AI turn, JSON validation with retry, the turn writes to the ledger.
 3. **Rules engine:** dice, HP, XP and levels, equipment, loot tables, difficulty clamps, visible dice, state persistence. Start with a small read-only Ledger view in the More sheet (entities and their facts, no AI call) so the memory can be checked while playing.
 4. **Retrieval and prompt assembly:** token budget per section, rolling summary, ledger retrieval, last-N turns, option variety, prompt caching of the static prefix, debug view of the assembled prompt.
-5. **Character:** character creation (content decided in depth at the start of the phase), the stat system and what each stat does, numbers and difficulty scale, level-ups and XP pace, three-result checks, Character screen. Works through the "Character progression review" below. Comes before combat so combat is built on the final stats.
+5. **Character:** character creation (content decided in depth at the start of the phase), the stat system and what each stat does, numbers and difficulty scale, level-ups and XP pace, three-result checks, morality axes (starting alignment, shifts, label), Character screen. Works through the "Character progression review" below. Comes before combat so combat is built on the final stats.
 6. **Combat:** code-resolved rounds, enemy tables, item effects, flee/surrender and morale, danger shown before fights and in the header, combat log, one AI summary call, permanent death and epilogue.
-7. **Quest structure:** milestone graph generation with 3 leads per milestone, threat clock with warning signs, day and time of day, NPC attitude and first-meeting reactions, quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
+7. **Quest structure:** milestone graph generation with 3 leads per milestone, threat clock with warning signs, day and time of day, NPC attitude and first-meeting reactions (shaped by alignment), quest flags, quest focus pinning, side quests, custom action classification and consequence-based responses, game-complete state.
 8. **Map and polish:** text map and Travel (with danger and time), rest with random events, generic buttons, journal, Codex (known NPCs, places, factions, items with their facts; edit and delete), new game flow with the "never include" field, recap on return, streaming narration, export/import, home screen icon.
 9. **Tuning:** bot-played test runs of 100+ turns logging tokens per turn, contradictions against the ledger, option repetition and difficulty distribution. Try a cheaper model. Add regenerate-with-fixed-dice; tune the threat clock if the loop feels too safe.
 
