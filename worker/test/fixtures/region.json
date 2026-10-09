@@ -1,0 +1,420 @@
+{
+ "region": {
+  "name": "The Harrow Reach",
+  "summary": "A wet stretch of toll road and ferries in the Fenmarch. Guilds fight over every crossing.",
+  "customs": [
+   "Ferrymen spit in the river before a crossing.",
+   "Lantern Church bells ring at dusk.",
+   "Tolls are paid in salt as often as coin."
+  ]
+ },
+ "truth": "The Concord factor Hale burned the bridge to force traffic onto his ferry and hide a sealed Vael cut upriver.",
+ "stake": "Your brother crossed at Harrow Ford a month ago and never reached Saltmill.",
+ "start": "Harrow Ford",
+ "places": [
+  {
+   "name": "Harrow Ford",
+   "kind": "village",
+   "description": "Harrow Ford, a mock place",
+   "links": [
+    {
+     "to": "Gull's Landing",
+     "parts": 1
+    }
+   ]
+  },
+  {
+   "name": "Gull's Landing",
+   "kind": "village",
+   "description": "Gull's Landing, a mock place",
+   "links": [
+    {
+     "to": "Saltmill",
+     "parts": 2
+    }
+   ]
+  },
+  {
+   "name": "Saltmill",
+   "kind": "village",
+   "description": "Saltmill, a mock place",
+   "links": [
+    {
+     "to": "The Grey Chapel",
+     "parts": 3
+    }
+   ]
+  },
+  {
+   "name": "The Grey Chapel",
+   "kind": "village",
+   "description": "The Grey Chapel, a mock place",
+   "links": [
+    {
+     "to": "Brannoch's Toll",
+     "parts": 1
+    }
+   ]
+  },
+  {
+   "name": "Brannoch's Toll",
+   "kind": "village",
+   "description": "Brannoch's Toll, a mock place",
+   "links": [
+    {
+     "to": "Wending Copse",
+     "parts": 2
+    }
+   ]
+  },
+  {
+   "name": "Wending Copse",
+   "kind": "village",
+   "description": "Wending Copse, a mock place",
+   "links": [
+    {
+     "to": "Old Vael Cut",
+     "parts": 3
+    }
+   ]
+  },
+  {
+   "name": "Old Vael Cut",
+   "kind": "village",
+   "description": "Old Vael Cut, a mock place",
+   "links": [
+    {
+     "to": "Harrow Ford",
+     "parts": 1
+    }
+   ]
+  }
+ ],
+ "factions": [
+  {
+   "name": "The Concord",
+   "goal": "Own every crossing",
+   "method": "Hired blades"
+  },
+  {
+   "name": "The Lantern Church",
+   "goal": "Keep the dead resting",
+   "method": "Wardens"
+  },
+  {
+   "name": "The Ferrymen",
+   "goal": "Keep their trade",
+   "method": "Smuggling"
+  }
+ ],
+ "npcs": [
+  {
+   "name": "Maren",
+   "role": "Seal-sewer at the ford",
+   "faction": "",
+   "place": "Harrow Ford",
+   "want": "her son back",
+   "fear": "Hale",
+   "secret": "she sewed the false seals",
+   "voice": "short sentences",
+   "values": "good",
+   "base": 0
+  },
+  {
+   "name": "Hale",
+   "role": "Concord factor",
+   "faction": "The Concord",
+   "place": "Gull's Landing",
+   "want": "the crossing",
+   "fear": "the Crown's auditors",
+   "secret": "the Vael cut",
+   "voice": "polite and cold",
+   "values": "law",
+   "base": -1
+  },
+  {
+   "name": "Sister Ide",
+   "role": "Lantern warden",
+   "faction": "The Lantern Church",
+   "place": "The Grey Chapel",
+   "want": "order",
+   "fear": "hedge-mages",
+   "secret": "she is marked",
+   "voice": "quotes scripture",
+   "values": "law",
+   "base": 0
+  },
+  {
+   "name": "Corwin Tull",
+   "role": "Ferryman",
+   "faction": "The Ferrymen",
+   "place": "Gull's Landing",
+   "want": "coin",
+   "fear": "drowning",
+   "secret": "smuggles for Hale",
+   "voice": "laughs too loudly",
+   "values": "chaos",
+   "base": 1
+  }
+ ],
+ "main": {
+  "title": "The Burned Crossing",
+  "conflict": "Hale closed the road to hide what lies upriver.",
+  "milestones": [
+   {
+    "title": "Learn who burned the bridge",
+    "goal": "The character has done: Learn who burned the bridge",
+    "leads": [
+     {
+      "text": "Learn who burned the bridge: first clue at Harrow Ford",
+      "target": "Harrow Ford"
+     },
+     {
+      "text": "Learn who burned the bridge: Maren knows more",
+      "target": "Maren"
+     },
+     {
+      "text": "Learn who burned the bridge: a note at Gull's Landing",
+      "target": "Gull's Landing"
+     }
+    ]
+   },
+   {
+    "title": "Find the ferry ledger",
+    "goal": "The character has done: Find the ferry ledger",
+    "leads": [
+     {
+      "text": "Find the ferry ledger: first clue at Harrow Ford",
+      "target": "Harrow Ford"
+     },
+     {
+      "text": "Find the ferry ledger: Maren knows more",
+      "target": "Maren"
+     },
+     {
+      "text": "Find the ferry ledger: a note at Gull's Landing",
+      "target": "Gull's Landing"
+     }
+    ]
+   },
+   {
+    "title": "Follow the salt money",
+    "goal": "The character has done: Follow the salt money",
+    "leads": [
+     {
+      "text": "Follow the salt money: first clue at Harrow Ford",
+      "target": "Harrow Ford"
+     },
+     {
+      "text": "Follow the salt money: Maren knows more",
+      "target": "Maren"
+     },
+     {
+      "text": "Follow the salt money: a note at Gull's Landing",
+      "target": "Gull's Landing"
+     }
+    ]
+   },
+   {
+    "title": "Reach the Vael cut",
+    "goal": "The character has done: Reach the Vael cut",
+    "leads": [
+     {
+      "text": "Reach the Vael cut: first clue at Harrow Ford",
+      "target": "Harrow Ford"
+     },
+     {
+      "text": "Reach the Vael cut: Maren knows more",
+      "target": "Maren"
+     },
+     {
+      "text": "Reach the Vael cut: a note at Gull's Landing",
+      "target": "Gull's Landing"
+     }
+    ]
+   },
+   {
+    "title": "Expose the false seals",
+    "goal": "The character has done: Expose the false seals",
+    "leads": [
+     {
+      "text": "Expose the false seals: first clue at Harrow Ford",
+      "target": "Harrow Ford"
+     },
+     {
+      "text": "Expose the false seals: Maren knows more",
+      "target": "Maren"
+     },
+     {
+      "text": "Expose the false seals: a note at Gull's Landing",
+      "target": "Gull's Landing"
+     }
+    ]
+   },
+   {
+    "title": "Confront Hale",
+    "goal": "The character has done: Confront Hale",
+    "leads": [
+     {
+      "text": "Confront Hale: first clue at Harrow Ford",
+      "target": "Harrow Ford"
+     },
+     {
+      "text": "Confront Hale: Maren knows more",
+      "target": "Maren"
+     },
+     {
+      "text": "Confront Hale: a note at Gull's Landing",
+      "target": "Gull's Landing"
+     }
+    ]
+   }
+  ],
+  "branches": [
+   {
+    "choice": "Hand Hale to the Wardens",
+    "outcome": "The Church takes the cut",
+    "milestones": [
+     {
+      "title": "Bring Hale to the chapel",
+      "goal": "The character has done: Bring Hale to the chapel",
+      "leads": [
+       {
+        "text": "Bring Hale to the chapel: first clue at The Grey Chapel",
+        "target": "The Grey Chapel"
+       },
+       {
+        "text": "Bring Hale to the chapel: Maren knows more",
+        "target": "Maren"
+       },
+       {
+        "text": "Bring Hale to the chapel: a note at Gull's Landing",
+        "target": "Gull's Landing"
+       }
+      ]
+     },
+     {
+      "title": "Seal the cut",
+      "goal": "The character has done: Seal the cut",
+      "leads": [
+       {
+        "text": "Seal the cut: first clue at Old Vael Cut",
+        "target": "Old Vael Cut"
+       },
+       {
+        "text": "Seal the cut: Maren knows more",
+        "target": "Maren"
+       },
+       {
+        "text": "Seal the cut: a note at Gull's Landing",
+        "target": "Gull's Landing"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "choice": "Make a deal with Hale",
+    "outcome": "The Concord keeps the road",
+    "milestones": [
+     {
+      "title": "Earn Hale's trust",
+      "goal": "The character has done: Earn Hale's trust",
+      "leads": [
+       {
+        "text": "Earn Hale's trust: first clue at Gull's Landing",
+        "target": "Gull's Landing"
+       },
+       {
+        "text": "Earn Hale's trust: Maren knows more",
+        "target": "Maren"
+       },
+       {
+        "text": "Earn Hale's trust: a note at Gull's Landing",
+        "target": "Gull's Landing"
+       }
+      ]
+     },
+     {
+      "title": "Open the cut together",
+      "goal": "The character has done: Open the cut together",
+      "leads": [
+       {
+        "text": "Open the cut together: first clue at Old Vael Cut",
+        "target": "Old Vael Cut"
+       },
+       {
+        "text": "Open the cut together: Maren knows more",
+        "target": "Maren"
+       },
+       {
+        "text": "Open the cut together: a note at Gull's Landing",
+        "target": "Gull's Landing"
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "clock": {
+  "name": "The cut is opened",
+  "signs": [
+   "Sign 1: strange lights upriver",
+   "Sign 2: strange lights upriver",
+   "Sign 3: strange lights upriver",
+   "Sign 4: strange lights upriver",
+   "Sign 5: strange lights upriver",
+   "Sign 6: strange lights upriver",
+   "Sign 7: strange lights upriver",
+   "Sign 8: strange lights upriver"
+  ],
+  "dooms": [
+   "Maren vanishes.",
+   "Saltmill burns.",
+   "The cut stands open."
+  ]
+ },
+ "side_quests": [
+  {
+   "title": "Maren's son",
+   "goal": "Find Maren's missing son",
+   "giver": "Maren",
+   "place": "Harrow Ford",
+   "leads": [
+    {
+     "text": "He was seen at Saltmill",
+     "target": "Saltmill"
+    },
+    {
+     "text": "Corwin ferried him",
+     "target": "Corwin Tull"
+    },
+    {
+     "text": "A letter at the chapel",
+     "target": "The Grey Chapel"
+    }
+   ]
+  },
+  {
+   "title": "The warden's mark",
+   "goal": "Keep Sister Ide's secret safe",
+   "giver": "Sister Ide",
+   "place": "The Grey Chapel",
+   "leads": [
+    {
+     "text": "Hale suspects her",
+     "target": "Hale"
+    },
+    {
+     "text": "A witness at the copse",
+     "target": "Wending Copse"
+    },
+    {
+     "text": "Old records at the chapel",
+     "target": "The Grey Chapel"
+    }
+   ]
+  }
+ ]
+}

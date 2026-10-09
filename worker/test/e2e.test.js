@@ -44,6 +44,12 @@ async function call(env, method, path, body, key = KEY) {
   return { status: res.status, data: await res.json() };
 }
 
+function turnCallsHaveThisTurn() {
+  const logged = fs.readFileSync(logFile, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const turns = logged.filter((c) => c.body.output_config?.format && !c.body.output_config.format.schema.properties.places).slice(1); // the first is the intro
+  return turns.length > 0 && turns.every((c) => /## This turn \(decided by the app; narrate it\)\nTime: Day \d+, \w+/.test(c.body.messages[0].content[1].text));
+}
+
 const CHARACTER = { name: "Wren", background: "hunter", drive: "missing", flaw: "reckless", law: "neutral", good: "good", free: { grit: 1, charm: 1 }, talent: "light-fingers" };
 
 before(async () => {
@@ -82,9 +88,30 @@ test("a 30-turn game: creation, turns, level-ups, talents, fact merge, summaries
   assert.ok(state.scene.options.length >= 3);
   // the intro: one AI call wrote the opening scene instead of the fixed one
   assert.match(state.scene.narration[0], /^Mock narration/);
-  const introCall = JSON.parse(fs.readFileSync(logFile, "utf8").trim().split("\n").at(-1));
-  assert.match(introCall.body.messages[0].content[1].text, /\(new game\) Write the opening scene/);
+  const calls0 = fs.readFileSync(logFile, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const regionCall = calls0.at(-2), introCall = calls0.at(-1);
+  // the region and story plan: one call with the region schema, the character and a code-picked setting
+  assert.ok(regionCall.body.output_config.format.schema.properties.places);
+  assert.equal(regionCall.body.output_config.effort, "medium");
+  assert.match(regionCall.body.messages[0].content, /Wren, a human hunter.*Drive: Someone you love is missing/s);
+  assert.match(regionCall.body.messages[0].content, /Set the story in /);
+  assert.match(introCall.body.messages[0].content[1].text, /\(new game\) Write the opening scene .* at Harrow Ford/s);
   assert.match(introCall.body.messages[0].content[1].text, /Drive: Someone you love is missing/);
+  assert.match(introCall.body.system[1].text, /This story's region: The Harrow Reach/);
+  assert.match(introCall.body.system[1].text, /Hidden truth .*Hale burned the bridge/);
+  assert.equal(state.location, "Harrow Ford");
+  assert.equal(state.time, "Day 1, morning");
+  const q0 = (await call(env, "GET", "/api/quests")).data;
+  assert.equal(q0.main.title, "The Burned Crossing");
+  assert.match(q0.main.stake, /Your brother/);
+  assert.equal(q0.main.current.leads.length, 1, "the first milestone opens with one lead");
+  assert.equal(q0.main.total, 8);
+  assert.deepEqual(q0.side, [], "seeded side quests stay hidden until taken up");
+  // the ledger shows only what the character has heard of: Maren (met in the intro), the start and its neighbours, not Hale
+  const led0 = (await call(env, "GET", "/api/ledger")).data;
+  assert.ok(led0.entities.some((e) => e.name === "Maren" && e.attitude));
+  assert.ok(!led0.entities.some((e) => e.name === "Hale"));
+  assert.ok(!JSON.stringify(led0).includes("sewed the false seals"), "secrets stay hidden");
 
   const kinds = {};
   const results = { success: 0, cost: 0, failure: 0 };
@@ -120,6 +147,16 @@ test("a 30-turn game: creation, turns, level-ups, talents, fact merge, summaries
     }
     state = r.data.state;
     for (const o of state.scene.options) assert.deepEqual(Object.keys(o), ["text", "tag"]);
+    if (i === 6) { // pin the side quest the story offered at turn 8 (mock: "The drowned cart"), then go back to the main quest
+      const qs = (await call(env, "GET", "/api/quests")).data;
+      const side = qs.side.find((x) => x.title === "The drowned cart");
+      assert.ok(side, JSON.stringify(qs.side));
+      assert.equal(qs.side.filter((x) => x.status === "active").length, 1, "a second story side quest is refused while one is open");
+      const f = await call(env, "POST", "/api/quest", { act: "focus", id: side.id });
+      assert.equal(f.data.state.focus, "The drowned cart");
+      assert.equal((await call(env, "POST", "/api/quest", { act: "focus", id: "s99" })).status, 409);
+      await call(env, "POST", "/api/quest", { act: "focus", id: "main" });
+    }
     await settle(); // background summary / fact merge, as ctx.waitUntil would run them
 
     // Character screen actions between turns: picks, a talent, a drop
@@ -155,7 +192,24 @@ test("a 30-turn game: creation, turns, level-ups, talents, fact merge, summaries
 
   // the save: prompt stayed flat, background jobs ran, the ledger stayed tidy, counters are consistent
   const save = JSON.parse(kv.raw("save:main"));
-  assert.equal(save.v, 5);
+  assert.equal(save.v, 6);
+  // Phase 7: steps, leads, time and the clock moved; people met got attitudes; a new person got a profile
+  const m1 = save.quests.main.milestones.m1;
+  assert.ok(save.counters.steps >= 3, `steps ${save.counters.steps}`);
+  assert.ok(m1.leads.filter((l) => l.revealed).length >= 2 || m1.status === "completed", "leads were revealed");
+  assert.ok(save.time.day >= 2 || save.time.part >= 2, `time ${JSON.stringify(save.time)}`);
+  assert.ok(save.clock.seen.length >= 1, "the threat clock ticked and its signs were told");
+  assert.ok(save.counters.values.advance > 0 && save.counters.values.sidetrack > 0);
+  assert.ok(save.counters.values.costly <= 6, "at most one costly option a turn");
+  const marenE = Object.values(save.ledger.entities).find((e) => e.name === "Maren");
+  assert.equal(marenE.met, true);
+  assert.ok(marenE.attitude >= 1, `Maren ${marenE.attitude}`); // the mock proposes +1 every 5 turns (one step a turn)
+  const tobin = Object.values(save.ledger.entities).find((e) => e.name === "Tobin Reed");
+  assert.equal(tobin.profile.voice, "hums sea songs");
+  assert.ok(!Object.values(save.ledger.entities).some((e) => e.type === "location" && e.name === "Far Place 4" && !e.region) || save.world.extra_places <= 4);
+  const gull = Object.values(save.ledger.entities).find((e) => e.name === "Gull's Landing");
+  assert.ok(gull.region && Object.keys(gull.travel).length >= 1, "generated places carry travel times");
+  assert.ok(turnCallsHaveThisTurn(), "every turn prompt has the This turn section");
   assert.equal(save.counters.ai_turns, 30);
   assert.ok(save.intro, "the intro call is recorded");
   assert.ok(save.summary.text.length > 0);
@@ -192,7 +246,7 @@ test("a 30-turn game: creation, turns, level-ups, talents, fact merge, summaries
   const sizeKB = Buffer.byteLength(kv.raw("save:main")) / 1024;
   const writes = (kv.writes - writes0) / 30;
   const logged = fs.readFileSync(logFile, "utf8").trim().split("\n").map((l) => JSON.parse(l));
-  const turnCalls = logged.filter((c) => c.body.output_config?.format);
+  const turnCalls = logged.filter((c) => c.body.output_config?.format && !c.body.output_config.format.schema.properties.places);
   console.log(`# e2e: save ${sizeKB.toFixed(1)} KB after 30 turns, ${writes.toFixed(1)} KV writes/turn, ${(cpuMs / 30).toFixed(2)} ms process CPU/turn (includes the mock HTTP round trip), ${turnCalls.length} turn calls, ${logged.length - turnCalls.length} background calls`);
   assert.ok(sizeKB < 200);
   assert.ok(writes < 5);
@@ -203,6 +257,7 @@ test("a 30-turn game: creation, turns, level-ups, talents, fact merge, summaries
   assert.deepEqual(first.system[1].cache_control, { type: "ephemeral" });
   assert.deepEqual(first.output_config.format.schema.properties.options.items.properties.tier.enum, ["easy", "standard", "hard", "daunting"]);
   assert.ok(turnCalls.every((c) => c.body.system[0].text === first.system[0].text));
+  assert.ok(turnCalls.every((c) => c.body.system[1].text === first.system[1].text), "the region block stays identical (cached)");
 });
 
 test("stale turns, fallbacks and the spend cap", async () => {
@@ -220,11 +275,19 @@ test("stale turns, fallbacks and the spend cap", async () => {
   const capped = makeEnv(kv, { DAILY_CAP_USD: "0" });
   const c = await call(capped, "POST", "/api/turn", { request_id: "d", turn: s0.turn, action: { kind: "option", index: 0 } });
   assert.equal(c.data.reason, "daily_cap");
-  // custom and generic actions work without a roll
-  const look = await call(env, "POST", "/api/turn", { request_id: "e", turn: s0.turn, action: { kind: "look" } });
-  assert.equal(look.data.turn.dice, null);
-  const custom = await call(env, "POST", "/api/turn", { request_id: "f", turn: look.data.state.turn, action: { kind: "custom", text: "  Climb   the\nwall  " } });
+  // the old Look and Talk buttons are gone
+  assert.equal((await call(env, "POST", "/api/turn", { request_id: "e", turn: s0.turn, action: { kind: "look" } })).status, 400);
+  // a free-text action: code rolls one die, the AI picks stat and tier from code's table; a wrong result is sent back once
+  await fetch(`http://127.0.0.1:${PORT}/__queue`, { method: "POST", body: JSON.stringify(["wrongroll"]) });
+  const custom = await call(env, "POST", "/api/turn", { request_id: "f", turn: s0.turn, action: { kind: "custom", text: "  Climb   the\nwall  " } });
   assert.equal(custom.data.turn.action, "Climb the wall");
+  assert.ok(!custom.data.fallback);
+  assert.equal(custom.data.turn.dice.tier, "standard");
+  assert.equal(custom.data.turn.dice.label, "Wits");
+  assert.match(custom.data.turn.dice.note, /free-text action/);
+  const saved = JSON.parse(kv.raw("save:main"));
+  assert.equal(saved.counters.retries, 1, "the wrong result was rejected once");
+  assert.equal(saved.recent.at(-1).custom_roll.value, "advance");
 });
 
 test("character actions are validated", async () => {
@@ -248,7 +311,7 @@ test("an old v3 save is copied, then migrated, once", async () => {
   kv.writes = 0;
   const state = (await call(env, "GET", "/api/state")).data;
   assert.equal(kv.raw("bak:main:v3"), raw, "the old save is kept byte for byte");
-  assert.equal(JSON.parse(kv.raw("save:main")).v, 5);
+  assert.equal(JSON.parse(kv.raw("save:main")).v, 6);
   assert.equal(kv.writes, 2);
   assert.equal(state.pc.level, 3);
   assert.equal(state.pc.pick.kind, "talent"); // a starting talent to choose
@@ -288,4 +351,88 @@ test("a v4 save (with Grim Resolve) upgrades to v5", async () => {
   const state = (await call(env, "GET", "/api/state")).data;
   assert.equal(kv.raw("bak:main:v4"), raw);
   assert.equal(state.pc.talents[0].name, "Stubborn");
+});
+
+test("a story plan that fails twice leaves the current game alone; one bad plan is retried", async () => {
+  const kv = makeKV();
+  const env = makeEnv(kv);
+  const first = (await call(env, "POST", "/api/new", { confirm: true, character: CHARACTER })).data;
+  const before = kv.raw("save:main");
+  await fetch(`http://127.0.0.1:${PORT}/__queue`, { method: "POST", body: JSON.stringify(["badregion", "badregion"]) });
+  const failed = await call(env, "POST", "/api/new", { confirm: true, character: { ...CHARACTER, name: "Other" } });
+  assert.equal(failed.status, 200); // streamed: the error is in the body
+  assert.equal(failed.data.error, "generation_failed");
+  assert.match(failed.data.detail, /6 to 8 places/);
+  assert.equal(kv.raw("save:main"), before, "the current game is untouched");
+  assert.equal((await call(env, "GET", "/api/state")).data.pc.name, first.pc.name);
+  await fetch(`http://127.0.0.1:${PORT}/__queue`, { method: "POST", body: JSON.stringify(["badregion"]) });
+  const retried = await call(env, "POST", "/api/new", { confirm: true, character: { ...CHARACTER, name: "Other" } });
+  assert.equal(retried.data.pc.name, "Other");
+  assert.equal(kv.raw("bak:main"), before, "the replaced game is kept as the one backup");
+  assert.ok(JSON.parse(kv.raw("save:main")).counters.region_cost > 0.1, "both plan attempts were paid");
+});
+
+test("New game keeps the phone's connection alive with spaces while the plan is written", async () => {
+  const env = makeEnv(makeKV(), { KEEPALIVE_MS: "100" });
+  await fetch(`http://127.0.0.1:${PORT}/__queue`, { method: "POST", body: JSON.stringify(["slowregion"]) });
+  const res = await worker.fetch(new Request("https://worker.test/api/new", { method: "POST", headers: { "X-Game-Key": KEY, "Content-Type": "application/json" }, body: JSON.stringify({ confirm: true, character: CHARACTER }) }), env, ctx);
+  const text = await res.text();
+  await settle();
+  assert.match(text, /^ {3,}\{/, "spaces first, then the JSON");
+  assert.equal(JSON.parse(text).pc.name, "Wren");
+});
+
+test("the decision, the finale and the epilogue, through the Worker", async () => {
+  const kv = makeKV();
+  const env = makeEnv(kv);
+  await call(env, "POST", "/api/new", { confirm: true, character: CHARACTER });
+  // jump to the last shared milestone, one step from the decision, with a character who rarely fails
+  const save = JSON.parse(kv.raw("save:main"));
+  const main = save.quests.main;
+  for (const id of ["m1", "m2", "m3", "m4", "m5"]) main.milestones[id].status = "completed";
+  Object.assign(main.milestones.m6, { status: "ongoing", steps: 5, started_turn: 1, last_step_turn: -10, last_move_turn: 1 });
+  main.milestones.m6.leads[0].revealed = true;
+  main.current = "m6";
+  for (const k of Object.keys(save.actors.pc.stats)) save.actors.pc.stats[k] = 40;
+  await kv.put("save:main", JSON.stringify(save));
+  let state = (await call(env, "GET", "/api/state")).data;
+  const turn = async (index) => {
+    const r = await call(env, "POST", "/api/turn", { request_id: `fin-${state.turn}-${index}`, turn: state.turn, action: { kind: "option", index } });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    state = r.data.state;
+    await settle();
+    return r.data;
+  };
+  // the advancing option finishes milestone 6 (unless a natural 1); then the choices appear as Decision options
+  for (let i = 0; i < 6 && !state.scene.options.some((o) => o.tag === "Decision"); i++) await turn(0);
+  const choices = state.scene.options.filter((o) => o.tag === "Decision").map((o) => o.text);
+  assert.deepEqual(choices, ["Hand Hale to the Wardens", "Make a deal with Hale"]);
+  assert.deepEqual((await call(env, "GET", "/api/quests")).data.main.choosing, choices);
+  const chose = await turn(state.scene.options.findIndex((o) => o.text === "Hand Hale to the Wardens"));
+  assert.equal(chose.turn.dice, null);
+  assert.ok(chose.events.includes("You chose: Hand Hale to the Wardens"));
+  const lastCall = JSON.parse(fs.readFileSync(logFile, "utf8").trim().split("\n").at(-1));
+  assert.match(lastCall.body.messages[0].content[1].text, /The character makes the key decision: "Hand Hale to the Wardens"/);
+  // play the branch to its end
+  for (let i = 0; i < 200 && !state.over; i++) await turn(0);
+  assert.ok(state.over, "the game is complete");
+  assert.equal(state.over.kind, "won");
+  assert.equal(state.over.epilogue, null);
+  assert.deepEqual(state.scene.options, []);
+  const q = (await call(env, "GET", "/api/quests")).data;
+  assert.equal(q.main.branch, "Hand Hale to the Wardens");
+  assert.ok(q.main.done.includes("Seal the cut"));
+  // no more turns; the epilogue is written once
+  assert.equal((await call(env, "POST", "/api/turn", { request_id: "after", turn: state.turn, action: { kind: "custom", text: "Wander" } })).data.error, "game_over");
+  const calls = () => fs.readFileSync(logFile, "utf8").trim().split("\n").length;
+  const n0 = calls();
+  const ep = await call(env, "POST", "/api/epilogue", {});
+  assert.equal(ep.status, 200);
+  assert.deepEqual(ep.data.over.epilogue, ["The crossing reopened.", "Maren found her son.", "The character walked on."]);
+  const epCall = JSON.parse(fs.readFileSync(logFile, "utf8").trim().split("\n").at(-1));
+  assert.match(epCall.body.messages[0].content, /The key decision: Hand Hale to the Wardens/);
+  await call(env, "POST", "/api/epilogue", {});
+  assert.equal(calls(), n0 + 1, "a second request reuses the stored epilogue");
+  const rep = (await call(env, "GET", "/api/playtest?last=5")).data;
+  assert.match(rep.text, /GAME OVER \(won/);
 });

@@ -8,7 +8,7 @@
   --accent: #d9a441;
   --good: #7fb069;
   --bad: #d96459;
-  --build: "1.42";
+  --build: "1.44";
   color-scheme: dark;
 }
 
@@ -43,8 +43,10 @@ body { font: 17px/1.5 Georgia, "Iowan Old Style", serif; overscroll-behavior: no
   padding: 8px 16px 6px;
   font-family: system-ui, sans-serif; font-size: 14px; color: var(--text);
 }
-.topbar .title { font-weight: 700; }
-.topbar .stats { font-weight: 600; }
+.topbar .title { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
+.topbar .stats { font-weight: 600; flex: none; white-space: nowrap; }
+.topbar .tod { font-weight: 400; color: var(--muted); }
+.topbar .tod:not(:empty)::before { content: " · "; }
 
 .hpbar { height: 4px; background: var(--line); }
 .hpbar > div { height: 100%; width: 100%; background: var(--good); transition: width 0.4s ease; }
@@ -215,3 +217,9 @@ button:disabled { opacity: 0.4; }
 
 /* Playtest log: the text itself, selectable as a fallback for Copy. */
 .logbox { width: 100%; height: 40vh; margin-top: 8px; padding: 8px; font: 11.5px/1.35 ui-monospace, Menlo, monospace; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+
+/* Quests panel and the epilogue (Phase 7). */
+.ledger-fact.quest-now { color: var(--accent); margin-top: 4px; }
+.ledger-fact.clock { letter-spacing: 2px; color: var(--amber); }
+.story .epilogue-head { font-family: system-ui, sans-serif; font-size: 15px; color: var(--accent); margin: 22px 0 10px; }
+.story .epilogue { font-style: italic; }

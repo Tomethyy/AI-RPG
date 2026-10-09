@@ -3,6 +3,7 @@
 import { TALENTS, BACKGROUNDS, DRIVES, FLAWS, STAT_LABELS } from "./content.js";
 import { alignLabel, resultOf, packUsed, packSlots } from "./rules.js";
 import { ARCHIVE_CHUNK } from "./schema.js";
+import { questBlock, timeLabel, attitudeLabel, PARTS } from "./quest.js";
 
 export const PLAYTEST_MAX = 60; // turns in one report
 
@@ -15,7 +16,8 @@ function diceLine(d) {
   return `d20 ${d.die}${edge} ${sign(d.mod)} ${d.label} = ${d.die + d.mod} vs ${d.dc}${d.tier ? ` (${d.tier})` : ""} -> ${resultOf(d)}${crit}${d.note ? ` [${d.note}]` : ""}`;
 }
 
-const optionLine = (o, i) => `${i + 1}) ${o.text} [${o.kind}, ${o.stat}, ${o.tier || "?"}${o.edge && o.edge !== "none" ? `, ${o.edge}: ${o.edge_why}` : ""}]`;
+const hidden = (o) => `${o.kind}, ${o.stat}, ${o.tier || "?"}${o.edge && o.edge !== "none" ? `, ${o.edge}: ${o.edge_why}` : ""}${o.value ? `, ${o.value}${o.quest ? ":" + o.quest : ""}` : ""}${o.npc ? `, to ${o.npc}` : ""}`;
+const optionLine = (o, i) => `${i + 1}) ${o.text} [${hidden(o)}]`;
 
 // Which turn records to load: the last `last` turns of the game, from the archive chunks.
 export function archiveKeys(save, last) {
@@ -42,7 +44,14 @@ export function playtestReport(save, records, last, { spend, model, effort } = {
   L.push(`Stats: ${Object.entries(p.stats).map(([k, v]) => `${STAT_LABELS[k]} ${sign(v)}`).join(", ")} · Talents: ${(p.talents || []).map((t) => TALENTS[t.id]?.name).join(", ") || "none"} · Pack ${packUsed(p)}/${packSlots(p)} · Conditions: ${p.conditions.join(", ") || "none"}`);
   L.push(`Equipment: ${Object.entries(p.equipment).filter(([, v]) => v).map(([s, v]) => `${s} ${v.name}`).join(", ") || "none"} · Inventory: ${p.inventory.map((i) => `${i.name}${i.qty > 1 ? " x" + i.qty : ""}`).join(", ") || "nothing"}`);
   const c = save.counters;
-  L.push(`Counters: AI turns ${c.ai_turns}, fallbacks ${c.fallbacks}, retries ${c.retries}, tiers ${JSON.stringify(c.tiers || {})}, results ${JSON.stringify(c.results || {})}, edges ${c.edges || 0}, repeats dropped ${c.options_dropped}, summaries ${c.summaries}, fact merges ${c.fact_merges || 0}, merges ${c.merges}${spend ? ` · spend today $${spend.today} of $${spend.cap}` : ""}`);
+  L.push(`Counters: AI turns ${c.ai_turns}, fallbacks ${c.fallbacks}, retries ${c.retries}, tiers ${JSON.stringify(c.tiers || {})}, results ${JSON.stringify(c.results || {})}, edges ${c.edges || 0}, repeats dropped ${c.options_dropped}, summaries ${c.summaries}, fact merges ${c.fact_merges || 0}, merges ${c.merges}, option values ${JSON.stringify(c.values || {})}, turns without a quest option ${c.no_quest_option || 0}, quest steps ${c.steps || 0}${spend ? ` · spend today $${spend.today} of $${spend.cap}` : ""}`);
+  L.push(`Now: ${timeLabel(save.time)}${save.world ? ` · region ${save.world.name} (plan by ${save.world.model}, $${(save.world.cost || 0).toFixed(4)})` : " · fixed Rusted Ford opening"}${save.over ? ` · GAME OVER (${save.over.kind}, turn ${save.over.turn})` : ""}`);
+  L.push("");
+  L.push("QUEST (as the AI sees it)");
+  L.push(questBlock(save));
+  if (save.world) L.push(`Hidden truth: ${save.world.truth}`);
+  const fl = save.quests.flags.slice(-12);
+  if (fl.length) L.push(`Quest log: ${fl.map((f) => `t${f.turn} ${f.text}`).join(" | ")}`);
   L.push("");
   L.push("STORY SO FAR (rolling summary)");
   L.push(save.summary.text || "(none yet)");
@@ -57,8 +66,8 @@ export function playtestReport(save, records, last, { spend, model, effort } = {
   for (const e of Object.values(save.ledger.entities)) newByTurn.set(e.first_turn, [...(newByTurn.get(e.first_turn) || []), `${e.name} (${e.type})`]);
   for (const r of turns) {
     const chosen = (prevOptions.get(r.n) || []).find((o) => o.text === r.action.text);
-    L.push(`## Turn ${r.n} · ${save.ledger.entities[r.location_id]?.name || "?"}`);
-    L.push(`Player (${r.action.kind}): ${r.action.text}${chosen ? ` [${chosen.kind}, ${chosen.stat}, ${chosen.tier || "?"}${chosen.edge && chosen.edge !== "none" ? `, ${chosen.edge}: ${chosen.edge_why}` : ""}]` : ""}`);
+    L.push(`## Turn ${r.n} · ${save.ledger.entities[r.location_id]?.name || "?"}${r.time ? ` · day ${r.time.day} ${PARTS[r.time.part]}` : ""}`);
+    L.push(`Player (${r.action.kind}): ${r.action.text}${chosen ? ` [${hidden(chosen)}]` : ""}${r.custom_roll ? ` [custom: ${r.classification}, ${r.custom_roll.stat} ${r.custom_roll.tier}, ${r.custom_roll.value}]` : ""}`);
     L.push(`Dice: ${diceLine(r.dice)}`);
     L.push(...r.narration);
     L.push(`Options offered:\n${r.options.map(optionLine).join("\n")}`);
@@ -67,6 +76,7 @@ export function playtestReport(save, records, last, { spend, model, effort } = {
     if (r.events?.length) L.push(`Events: ${r.events.join(" | ")}`);
     const facts = (r.new_facts || []).filter((f) => f.fact).map((f) => `${f.entity} [${f.kind || "-"}]: ${f.fact}`);
     if (facts.length) L.push(`Facts recorded: ${facts.join(" | ")}`);
+    if (r.side_quest) L.push(`Side quest proposed: ${r.side_quest.title} (${r.side_quest.giver}): ${r.side_quest.goal}`);
     const fresh = newByTurn.get(r.n);
     if (fresh) L.push(`NEW NAMES THIS TURN (${fresh.length}): ${fresh.join(", ")}`);
     const u = r.usage || {};
@@ -79,7 +89,8 @@ export function playtestReport(save, records, last, { spend, model, effort } = {
   L.push("LEDGER (what the app remembers)");
   const byType = Object.values(save.ledger.entities).sort((a, b) => a.type.localeCompare(b.type) || a.first_turn - b.first_turn);
   for (const e of byType) {
-    L.push(`- ${e.name} (${e.type}${e.aliases.length ? `, also ${e.aliases.join(" / ")}` : ""}, since turn ${e.first_turn}): ${e.facts.map((f) => `${f.kind ? `[${f.kind}] ` : ""}${f.text}`).join("; ") || "no facts"}`);
+    const who = e.type === "npc" ? (e.met === false ? ", not met" : `, ${attitudeLabel(e.attitude)}`) : "";
+    L.push(`- ${e.name} (${e.type}${who}${e.known === false ? ", not known yet" : ""}${e.aliases.length ? `, also ${e.aliases.join(" / ")}` : ""}, since turn ${e.first_turn}): ${e.facts.map((f) => `${f.kind ? `[${f.kind}] ` : ""}${f.text}`).join("; ") || "no facts"}`);
   }
   if (save.fallback_log?.length) {
     L.push("");

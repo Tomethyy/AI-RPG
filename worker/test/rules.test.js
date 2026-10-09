@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { newGame, migrate, ledgerView, publicState } from "../src/schema.js";
 import {
   rollOption, classify, applyChanges, gainXp, turnDie, logDifficulty, rng, xpForLevel, XP_AT, maxHpOf, packUsed, packSlots,
-  applyPick, useTalent, dropItem, alignLabel, recordFailure, activeFailures, clearFailures, consumeEdge, addTalent, resultOf, awardQuestXp,
+  applyPick, useTalent, dropItem, alignLabel, recordFailure, activeFailures, clearFailures, consumeEdge, addTalent, resultOf, XP,
 } from "../src/rules.js";
 import { TIERS, TALENTS, BACKGROUNDS } from "../src/content.js";
 import { validateCharacter, DEFAULT_CHARACTER } from "../src/character.js";
@@ -141,8 +141,9 @@ test("xp: one note per turn, a table sized for the game, levels give a stat pick
   assert.equal(p.xp, at);
   const q = [];
   const s2 = game();
-  awardQuestXp(s2, s2.actors.pc, "milestone", q);
-  assert.equal(s2.actors.pc.xp, 25);
+  applyChanges(s2, [], null, q, { bonus: false, extra: XP.milestone }); // quest XP rides in the turn's one note
+  assert.equal(s2.actors.pc.xp, 26);
+  assert.deepEqual(q, ["+26 XP"]);
 });
 
 test("picks: raise a stat, choose a talent; max HP follows Grit and Tough as Boots", () => {
@@ -320,7 +321,7 @@ test("v3 saves migrate to v4: new stat, talent picks, tiers, hp formula", () => 
   assert.equal(old.v, 3);
   const s = migrate(structuredClone(old));
   const p = s.actors.pc;
-  assert.equal(s.v, 5);
+  assert.equal(s.v, 6);
   assert.equal(p.stats.charm, 0);
   assert.equal(p.stats.wits, 3);
   assert.equal(p.level, 3);
@@ -336,7 +337,7 @@ test("v3 saves migrate to v4: new stat, talent picks, tiers, hp formula", () => 
   assert.deepEqual(s.failed, []);
   assert.equal(s.ledger.entities["location-the-rusted-ford"].facts.length, 2);
   assert.equal(s.counters.dc[11], 2);
-  assert.equal(migrate(structuredClone(s)).v, 5); // migrating again changes nothing
+  assert.equal(migrate(structuredClone(s)).v, 6); // migrating again changes nothing
   assert.equal(publicState(s).pc.pick.kind, "talent");
 });
 
@@ -347,7 +348,7 @@ test("v1 saves migrate to the rules engine", () => {
   s.actors.pc.equipment = { weapon: { id: "item-worn-shortsword", name: "Worn shortsword" } };
   delete s.ledger.entities["location-the-rusted-ford"].danger;
   migrate(s);
-  assert.equal(s.v, 5);
+  assert.equal(s.v, 6);
   assert.equal(s.actors.pc.equipment.weapon.damage, 3);
   assert.equal(s.ledger.entities["location-the-rusted-ford"].danger, 0);
   assert.deepEqual(s.counters.dc, {});

@@ -49,11 +49,11 @@ const TURNS = [
   },
 ];
 
-const JS_BUILD = "1.42"; // stamped by stamp.py
+const JS_BUILD = "1.44"; // stamped by stamp.py
 const HP_MAX = 20;
 const GENERIC = ["Talents", "Travel", "Rest", "Custom"];
-const MORE = ["Character", "Ledger", "Prompt", "Playtest log", "Wildcard"];
-const PANELS = new Set(["Character", "Ledger", "Prompt", "Playtest log"]); // open inside the More sheet
+const MORE = ["Character", "Quests", "Ledger", "Prompt", "Playtest log", "Wildcard"];
+const PANELS = new Set(["Character", "Quests", "Ledger", "Prompt", "Playtest log"]); // open inside the More sheet
 let turnIndex = 0;
 
 function renderTurn(index, chosenText) {
@@ -87,8 +87,9 @@ function setBusy(on) {
 
 function applyState(state) {
   game = state;
-  renderHeader(state.location, state.pc.hp, state.pc.hp_max, state.turn);
-  renderOptions(state.scene.options, (i) => act({ kind: "option", index: i }, state.scene.options[i].text));
+  renderHeader(state.location, state.pc.hp, state.pc.hp_max, state.turn, state.part || "");
+  if (state.over) renderGameOver(state);
+  else renderOptions(state.scene.options, (i) => act({ kind: "option", index: i }, state.scene.options[i].text));
   // A waiting level-up choice lights up the More button and the Character entry.
   const waiting = !!state.pc.pick;
   generic.lastElementChild?.classList.toggle("alert", waiting);
@@ -104,9 +105,40 @@ function renderFull(state) {
     story.append(el("p", "chosen", "▸ " + t.action));
     if (t.dice) story.append(renderDice(t.dice, false));
     for (const p of t.narration) story.append(el("p", "", p));
+    for (const e of t.events || []) if (QUEST_NOTE.test(e)) story.append(el("p", "note", e));
   }
+  if (state.over?.epilogue) appendEpilogue(state.over.epilogue);
   applyState(state);
   scrollDown();
+}
+
+// Quest notes stay visible when the story is redrawn (XP and loot notes do not).
+const QUEST_NOTE = /^(New lead|Milestone complete|New side quest|Side quest|You chose|A decision|The threat grows|Doom|The story is complete)/;
+
+function appendEpilogue(paragraphs) {
+  story.append(el("h3", "epilogue-head", "Epilogue"));
+  for (const p of paragraphs) story.append(el("p", "epilogue", p));
+}
+
+// The story is over: the options make way for the epilogue, then for a new game.
+function renderGameOver(state) {
+  const options = $("options");
+  options.replaceChildren();
+  const btn = el("button", "", state.over.epilogue ? "Start a new game" : "Read the epilogue");
+  btn.type = "button";
+  btn.addEventListener("click", async () => {
+    if (state.over.epilogue) { setSheet(true); openCreation(); return; }
+    if (busy) return;
+    setBusy(true);
+    $("pending").textContent = "The narrator is writing the epilogue…";
+    try {
+      const { status, data } = await api("/api/epilogue", {});
+      setBusy(false);
+      if (status === 200 && data?.over?.epilogue) { appendEpilogue(data.over.epilogue); applyState(data); scrollDown(); }
+      else addNote(`Couldn't write the epilogue (${status}${data?.error ? ": " + data.error : ""}). Tap to try again.`);
+    } catch { setBusy(false); addNote("Couldn't reach the server. Tap to try again."); }
+  });
+  options.append(btn);
 }
 
 const REASONS = { daily_cap: "Today's spend cap is reached", ai_failed: "The narrator didn't answer", no_api_key: "The server has no API key yet" };
@@ -123,7 +155,7 @@ function handleReply(status, data) {
     scrollDown();
     return true;
   }
-  if (status === 409 && data?.state) { renderFull(data.state); addNote("(Synced with the saved game.)"); return true; }
+  if (status === 409 && data?.state) { renderFull(data.state); addNote(data.error === "game_over" ? "(The story is over.)" : "(Synced with the saved game.)"); return true; }
   if (status === 401) { addNote("Server key rejected. Check it in More → Server."); return true; }
   addNote(`Server error (${status || "no reply"}${data?.error ? ": " + data.error : ""}). Tap to try again.`);
   return status >= 400 && status < 500; // 4xx: don't resend the same request
@@ -206,6 +238,7 @@ function closeCustom() {
 
 function useGeneric(label) {
   if (label === "Character") { openCharacter(); return; }
+  if (label === "Quests") { openQuests(); return; }
   if (label === "Ledger") { openLedger(); return; }
   if (label === "Prompt") { openPrompt(); return; }
   if (label === "Playtest log") { openPlaytest(25); return; }

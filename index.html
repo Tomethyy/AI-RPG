@@ -8,8 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AI-RPG">
 <meta name="theme-color" content="#14110f">
-<meta name="build" content="1.42|2026-10-09T22:04Z">
-<link rel="manifest" href="manifest.webmanifest?v=1.42">
+<meta name="build" content="1.44|2026-10-09T22:45Z">
+<link rel="manifest" href="manifest.webmanifest?v=1.44">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <title>AI-RPG</title>
@@ -17,14 +17,14 @@
 // Home Screen app: flag it early so the standalone-only layout rules apply before first paint.
 if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) document.documentElement.classList.add("standalone");
 </script>
-<link rel="stylesheet" href="style.css?v=1.42">
+<link rel="stylesheet" href="style.css?v=1.44">
 </head>
 <body>
 <div class="app" id="app">
   <div class="head">
     <header class="topbar">
       <span class="title" id="location">The Rusted Ford</span>
-      <span class="stats"><span id="hp">HP 18/20</span> · <span id="turn">Turn 1</span></span>
+      <span class="stats"><span id="hp">HP 18/20</span> · <span id="turn">Turn 1</span><span id="tod" class="tod"></span></span>
     </header>
     <div class="hpbar" id="hpbar" role="progressbar" aria-label="HP" aria-valuemin="0"><div id="hpfill"></div></div>
   </div>
@@ -68,9 +68,9 @@ if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) do
     </div>
   </div>
 </div>
-<script src="ui.js?v=1.42"></script>
-<script src="panels.js?v=1.42"></script>
-<script src="character.js?v=1.42"></script>
-<script src="app.js?v=1.42"></script>
+<script src="ui.js?v=1.44"></script>
+<script src="panels.js?v=1.44"></script>
+<script src="character.js?v=1.44"></script>
+<script src="app.js?v=1.44"></script>
 </body>
 </html>

@@ -4,14 +4,14 @@ import { STATS, slugify } from "./schema.js";
 import { TIERS, tierFromNumber, TALENTS, TALENT_COOLDOWN } from "./content.js";
 
 export const MAX_LEVEL = 10;
-// Total XP needed to reach level n. Sized for a 150-250 turn game: about 2 XP a turn plus milestone XP lands on level 6-8.
+// Total XP needed to reach level n: about 2 XP a turn plus quest XP. Sized for 150-250 turns; to be stretched (about 1.5x) once playtests settle the length.
 export const XP_AT = [0, 0, 40, 100, 190, 310, 460, 640, 860, 1120, 1420];
 export const xpForLevel = (level) => XP_AT[Math.max(1, Math.min(level, MAX_LEVEL))];
 export const LEVEL_HP = 3;
 export const STAT_MAX = 8;
 export const ALIGN_MAX = 12;
 // Where XP comes from: every roll pays a little (a failure teaches), the AI may add a small bonus for a notable moment,
-// and quests pay the big amounts (awarded by the quest code in Phase 7 through awardQuestXp).
+// and quests pay the big amounts (quest.js returns them; applyChanges folds them into the turn's one XP note).
 export const XP = { success: 2, cost: 2, failure: 1, none: 1, ai_max: 3, milestone: 25, side_quest: 10 };
 export const WOUNDED = "Wounded";
 const FAILED_KEEP = 4, FAILED_TURNS = 8;
@@ -147,26 +147,35 @@ export function classify(die, total, dc) {
 const RESULT_TEXT = { success: "Success", cost: "Success at a cost", failure: "Failure" };
 export const resultLabel = (r) => RESULT_TEXT[r] || r;
 
-export function rollOption(save, option) {
+// The modifier for a check with one stat: the stat, matching gear, talent bonuses (those tied to an option kind only when the kind is known), wounded.
+export function statMod(a, stat, kind) {
+  const parts = [];
+  let mod = a.stats[stat] || 0;
+  const gear = Object.values(a.equipment).find((g) => g && g.bonus_stat === stat);
+  if (gear) { mod += 1; parts.push(`+1 ${gear.name}`); }
+  for (const { t, e } of talentEffects(a, "bonus")) {
+    if ((!e.stat || e.stat === stat) && (!e.kind || e.kind === kind)) { mod += e.amount; parts.push(`+${e.amount} ${TALENTS[t.id].name}`); }
+  }
+  if (a.conditions.includes(WOUNDED)) { mod -= 1; parts.push("-1 wounded"); }
+  return { mod, parts };
+}
+
+// extra: { dcMod, why } from the quest code (an NPC's attitude makes a social check easier or harder).
+export function rollOption(save, option, extra = {}) {
   const a = save.actors[save.party[0]];
   const danger = dangerOf(save, save.scene.location_id);
   const tier = TIERS[option.tier] ? option.tier : tierFromNumber(Number(option.difficulty) || 10);
-  const dc = TIERS[tier] + danger;
-  const parts = [];
-  let mod = a.stats[option.stat] || 0;
-  const gear = Object.values(a.equipment).find((g) => g && g.bonus_stat === option.stat);
-  if (gear) { mod += 1; parts.push(`+1 ${gear.name}`); }
-  for (const { t, e } of talentEffects(a, "bonus")) {
-    if ((!e.stat || e.stat === option.stat) && (!e.kind || e.kind === option.kind)) { mod += e.amount; parts.push(`+${e.amount} ${TALENTS[t.id].name}`); }
-  }
-  if (a.conditions.includes(WOUNDED)) { mod -= 1; parts.push("-1 wounded"); }
+  const dcMod = extra.dcMod || 0;
+  const dc = TIERS[tier] + danger + dcMod;
+  const { mod, parts } = statMod(a, option.stat, option.kind);
+  if (dcMod) parts.push(`${extra.why}: difficulty ${dcMod > 0 ? "+" : ""}${dcMod}`);
 
   let adv = option.edge === "advantage", dis = option.edge === "disadvantage";
   if (adv) parts.push(`advantage: ${option.edge_why || "the situation helps"}`);
   if (dis) parts.push(`disadvantage: ${option.edge_why || "the situation hurts"}`);
   let edgeSource = null;
   const nx = a.edge_next;
-  if (nx && (!nx.kind || nx.kind === option.kind)) { adv = true; edgeSource = "talent"; parts.push("advantage: talent"); }
+  if (nx && (!nx.kind || nx.kind === option.kind)) { adv = true; edgeSource = "talent"; parts.push(nx.from === "insight" ? "advantage: insight" : "advantage: talent"); }
   const edge = adv && !dis ? "advantage" : dis && !adv ? "disadvantage" : null;
   if (adv && dis) parts.push("advantage and disadvantage cancel out");
 
@@ -182,16 +191,37 @@ export function rollOption(save, option) {
   };
 }
 
+// A free-text action: one seeded die, and the result for every stat and tier, so the AI can pick the stat and tier in the
+// same call that narrates the result; code then checks the result the AI reports against this table.
+export function customTable(save) {
+  const a = save.actors[save.party[0]];
+  const danger = dangerOf(save, save.scene.location_id);
+  const die = turnDie(save, "custom");
+  const rows = {};
+  for (const stat of STATS) {
+    const { mod, parts } = statMod(a, stat, null);
+    rows[stat] = { mod, note: parts.join(", "), results: Object.fromEntries(Object.entries(TIERS).map(([tier, n]) => [tier, classify(die, die + mod, n + danger)])) };
+  }
+  return { die, danger, rows };
+}
+
+export function customDice(table, stat, tier) {
+  const row = table.rows[stat];
+  if (!row || !TIERS[tier]) return null;
+  const result = row.results[tier];
+  return {
+    die: table.die, edge: null, edge_src: null, mod: row.mod, dc: TIERS[tier] + table.danger, tier,
+    label: stat[0].toUpperCase() + stat.slice(1), result, crit: table.die === 20 ? 20 : table.die === 1 ? 1 : null,
+    success: result === "success", note: ["free-text action", row.note].filter(Boolean).join(", "),
+  };
+}
+
 // A used "next check" talent is spent once the turn is applied (rolling itself never changes the save, so a replay rolls the same).
 export function consumeEdge(save, dice) {
   if (dice?.edge_src === "talent") save.actors[save.party[0]].edge_next = null;
 }
 
 // ---- XP, levels, picks ----
-
-export function awardQuestXp(save, actor, kind, events) {
-  gainXp(save, actor, kind === "milestone" ? XP.milestone : XP.side_quest, events);
-}
 
 // Three talents from those not owned, seeded per game: one from the character's best stat when there is one, two from the rest.
 function offerTalents(save, actor, label) {
@@ -404,6 +434,8 @@ function removeItem(actor, name, qty) {
   return "not_found";
 }
 
+const QUEST_KINDS = new Set(["move", "attitude", "time"]);
+
 // Keep an actor above 0 until Phase 6 adds combat and permanent death.
 export function settleWounded(actor) {
   const wounded = actor.conditions.includes(WOUNDED);
@@ -411,8 +443,10 @@ export function settleWounded(actor) {
   else if (wounded && actor.hp >= Math.ceil(actor.hp_max / 2)) actor.conditions = actor.conditions.filter((c) => c !== WOUNDED);
 }
 
-// Returns { changes, events }. `move` is handled by the caller (it needs the ledger); everything else is validated here.
-export function applyChanges(save, proposed, dice, events = []) {
+// Returns { changes, events }. move, attitude and time belong to the quest code (quest.js); everything else is validated here.
+// opts.bonus: the AI's XP bonus for a notable moment counts only on a turn that served a quest (options that matter);
+// opts.extra: quest XP (milestones, side quests) from quest.js, folded into the turn's one XP note.
+export function applyChanges(save, proposed, dice, events = [], opts = { bonus: true, extra: 0 }) {
   const changes = [];
   const player = save.actors[save.party[0]];
   // One XP note per turn: the roll, plus the AI's bonus for a notable moment (capped).
@@ -421,7 +455,7 @@ export function applyChanges(save, proposed, dice, events = []) {
   const shifted = new Set();
   for (const c of proposed) {
     const a = save.actors[c.actor] || player;
-    if (c.kind === "move") { changes.push(c); continue; }
+    if (QUEST_KINDS.has(c.kind)) { changes.push(c); continue; }
     let result = "applied";
     if (c.kind === "hp") {
       const delta = Math.max(-Math.ceil(a.hp_max / 2), Math.min(Math.ceil(a.hp_max / 4), c.amount));
@@ -429,7 +463,7 @@ export function applyChanges(save, proposed, dice, events = []) {
       a.hp = Math.max(1, Math.min(a.hp_max, a.hp + delta));
       if (a.hp !== before + delta) result = "clamped";
     } else if (c.kind === "xp") {
-      if (a === player) bonus = Math.min(XP.ai_max, bonus + Math.max(0, c.amount));
+      if (a === player && opts.bonus) bonus = Math.min(XP.ai_max, bonus + Math.max(0, c.amount));
       else result = "ignored";
     } else if (c.kind === "item_add") {
       if (c.text) result = addItem(save, a, c.text, Math.max(1, Math.min(99, c.amount || 1)), events);
@@ -447,7 +481,7 @@ export function applyChanges(save, proposed, dice, events = []) {
     }
     changes.push({ ...c, applied: result !== "ignored" && result !== "not_found" && result !== "full", result });
   }
-  gainXp(save, player, xp + bonus, events);
+  gainXp(save, player, xp + bonus + (opts.extra || 0), events);
   for (const id of save.party) settleWounded(save.actors[id]);
   return { changes, events };
 }

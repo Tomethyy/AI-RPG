@@ -89,7 +89,7 @@ test("cost and schema basics", () => {
   assert.equal(costUSD("claude-haiku-5-5", { output_tokens: 1e6 }), 0.5);
   assert.equal(OUTPUT_SCHEMA.additionalProperties, false);
   assert.ok(SCHEMA_TOKENS > 100);
-  assert.equal(SCHEMA_VERSION, 5);
+  assert.equal(SCHEMA_VERSION, 6);
   assert.equal(migrate(newGame()).v, SCHEMA_VERSION);
   assert.throws(() => migrate({ v: SCHEMA_VERSION + 1 }));
   const pub = publicState(newGame());
@@ -178,7 +178,7 @@ test("v4 saves migrate to v5", () => {
   s.actors.pc.talents = [{ id: "grim-resolve", ready_turn: 0 }];
   s.actors.pc.picks = [{ kind: "talent", level: 3, offer: ["grim-resolve", "keen-eye", "stubborn"] }];
   migrate(s);
-  assert.equal(s.v, 5);
+  assert.equal(s.v, 6);
   assert.equal(s.actors.pc.talents[0].id, "stubborn");
   assert.deepEqual(s.actors.pc.picks[0].offer, ["stubborn", "keen-eye"]);
 });

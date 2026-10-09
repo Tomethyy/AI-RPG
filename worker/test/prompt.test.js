@@ -31,7 +31,7 @@ function longSave(turn = 500) {
 }
 
 test("every section stays inside its budget, however long the campaign", () => {
-  const short = buildPrompt(newGame(), { kind: "look", text: "Look around" }, null);
+  const short = buildPrompt(newGame(), { kind: "custom", text: "Look around" }, null);
   const long = buildPrompt(longSave(), { kind: "custom", text: "x".repeat(300) }, null);
   for (const sec of long.sections) if (sec.budget) assert.ok(sec.tokens <= sec.budget, `${sec.name}: ${sec.tokens} > ${sec.budget}`);
   const cap = Object.values(BUDGET).reduce((a, b) => a + b, 0) + estTokens(RULES) + estTokens(WORLD) + 100;
@@ -39,12 +39,12 @@ test("every section stays inside its budget, however long the campaign", () => {
   assert.ok(long.est.total < 6500);
   assert.ok(short.est.total < long.est.total);
   // turn 500 and turn 5000 cost the same
-  assert.ok(Math.abs(buildPrompt(longSave(5000), { kind: "look", text: "Look around" }, null).est.total - buildPrompt(longSave(500), { kind: "look", text: "Look around" }, null).est.total) < 30);
+  assert.ok(Math.abs(buildPrompt(longSave(5000), { kind: "custom", text: "Look around" }, null).est.total - buildPrompt(longSave(500), { kind: "custom", text: "Look around" }, null).est.total) < 30);
 });
 
 test("cache layout: static system prefix, stable summary block, volatile rest", () => {
   const s = longSave(40);
-  const a = buildPrompt(s, { kind: "look", text: "Look around" }, null);
+  const a = buildPrompt(s, { kind: "custom", text: "Look around" }, null);
   s.actors.pc.hp = 3;
   const b = buildPrompt(s, { kind: "custom", text: "Climb the wall" }, { die: 3, mod: 0, dc: 12, label: "Might", result: "failure", success: false });
   assert.equal(a.system[0].text, RULES);
@@ -64,11 +64,11 @@ test("the prompt carries the character, the three results and the failed approac
   s.turn = 5;
   s.recent = [record(5)];
   const text = (p) => p.messages[0].content[1].text;
-  const plain = buildPrompt(s, { kind: "look", text: "Look around" }, null);
+  const plain = buildPrompt(s, { kind: "custom", text: "Look around" }, null);
   for (const w of ["Wren", "Hunter", "charm +1", "Chaotic Good", "Drive: Someone wronged you", "Flaw: Greedy", "Keen Eye", "Pack 2/13 slots"]) assert.ok(text(plain).includes(w), w);
   assert.ok(!text(plain).includes("Failed approaches"));
   recordFailure(s, { kind: "option", text: "Pick the lock" }, { result: "failure" });
-  assert.ok(text(buildPrompt(s, { kind: "look", text: "Look around" }, null)).includes("Failed approaches (do not offer again unless something has clearly changed)\nPick the lock"));
+  assert.ok(text(buildPrompt(s, { kind: "custom", text: "Look around" }, null)).includes("Failed approaches (do not offer again unless something has clearly changed)\nPick the lock"));
   const d = rollOption(s, { text: "x", kind: "explore", stat: "wits", tier: "hard", edge: "advantage", edge_why: "lantern" });
   assert.match(rollText(d), /^d20 \d+ \(advantage, best of \d+ and \d+\) \+\d Wits = \d+ vs difficulty 13: (SUCCESS|FAILURE|SUCCESS AT A COST)/);
   assert.match(rollText({ die: 11, mod: 1, dc: 13, label: "Might", result: "cost" }), /SUCCESS AT A COST/);
@@ -82,7 +82,7 @@ test("turns since the summary: newest verbatim, the rest in brief, none lost", (
   s.turn = 19;
   s.summary.through_turn = 10;
   s.recent = Array.from({ length: 9 }, (_, i) => record(11 + i));
-  const p = buildPrompt(s, { kind: "look", text: "Look around" }, null);
+  const p = buildPrompt(s, { kind: "custom", text: "Look around" }, null);
   const brief = p.sections.find((x) => x.name === "Earlier, in brief").text;
   const turns = p.sections.find((x) => x.name === "Earlier turns").text;
   for (const n of [11, 12, 13, 14]) assert.ok(brief.includes(`Turn ${n}.`), `brief misses ${n}`);
@@ -186,7 +186,7 @@ test("v2 saves migrate forward", () => {
   s.summary = { text: "", through_turn: 0 };
   s.counters = { ai_turns: 3, fallbacks: 0, retries: 0, dc: {}, dc_clamped: 0 };
   migrate(s);
-  assert.equal(s.v, 5);
+  assert.equal(s.v, 6);
   assert.equal(s.summary.requested_through, 0);
   assert.equal(s.counters.ai_turns, 3);
   assert.deepEqual(s.counters.kinds, {});

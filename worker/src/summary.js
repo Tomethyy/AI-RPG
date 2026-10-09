@@ -6,13 +6,14 @@ import { makeClient, costUSD, DEFAULT_SUMMARY_MODEL } from "./ai.js";
 import { rollText } from "./prompt.js";
 
 export const SUMMARY_WORDS = 250;
-const HARD_WORDS = 320; // cut if the model overshoots
+const TARGET_WORDS = 200; // asked for; models overshoot (321 words seen against 250), so the ask sits below the limit
+const HARD_WORDS = 280; // a longer reply is cut at the last sentence end before this
 const MAX_TURNS_IN = 40; // a long backlog (an old save) is summarized from its newest 40 turns
 const IN_FLIGHT_MS = 120_000;
 
 const RULES = `You keep the running summary of a solo text RPG campaign. You get the summary so far and the turns played since. Rewrite them as one updated summary.
 
-- At most ${SUMMARY_WORDS} words of plain prose, past tense, no headings or lists.
+- About ${TARGET_WORDS} words of plain prose, never more than ${SUMMARY_WORDS}; past tense, no headings or lists.
 - Keep what matters later: what the player character did, learned and decided; promises, debts, allies and enemies; open threads and unanswered questions; where the character is now and why.
 - Drop moment-to-moment detail, dice and descriptions. People and places are stored separately, so name them but don't describe them.
 - Say where things stand at the END of the last turn. If an action had only begun there (someone is leaving, a fight is starting), write that it had begun, never that it finished.
@@ -55,6 +56,7 @@ export function summaryJob(save, due) {
     language: save.settings.language,
     pc: save.actors[save.party[0]].name,
     quest: `${q.title} (current milestone: ${q.milestones[q.current]?.title || "none"})`,
+    time: save.time ? `Day ${save.time.day}` : "",
   };
 }
 
@@ -68,14 +70,17 @@ async function gatherTurns(env, job) {
   return [...have.values()].sort((a, b) => a.n - b.n);
 }
 
-function capWords(text, n) {
+export function capWords(text, n) {
   const w = text.trim().split(/\s+/);
-  return w.length <= n ? text.trim() : w.slice(0, n).join(" ") + " …";
+  if (w.length <= n) return text.trim();
+  const cut = w.slice(0, n).join(" ");
+  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "), cut.lastIndexOf('." '));
+  return end > cut.length * 0.6 ? cut.slice(0, end + 1).replace(/\s*$/, "") + (cut[end + 1] === '"' ? '"' : "") : cut + " …";
 }
 
 export function summaryPrompt(job, turns) {
   const lines = turns.map((t) => `Turn ${t.n}. Player: ${t.action.text}. ${rollText(t.dice)}\n${t.narration.join(" ")}`);
-  return `Write in ${job.language}.\nPlayer character: ${job.pc}\nMain quest: ${job.quest}\n\n## Summary so far\n${job.text || "(none yet: the story has just begun)"}\n\n## Turns since\n${lines.join("\n\n")}`;
+  return `Write in ${job.language}.\nPlayer character: ${job.pc}\nMain quest: ${job.quest}${job.time ? `\nNow: ${job.time}` : ""}\n\n## Summary so far\n${job.text || "(none yet: the story has just begun)"}\n\n## Turns since\n${lines.join("\n\n")}`;
 }
 
 // Background run. addSpend books the cost against the daily cap.

@@ -270,22 +270,24 @@ async function openCreation() {
 
   async function submit() {
     if (!ready() || !confirm("Start a new game with this character? The current run is replaced (one backup is kept on the server).")) return;
-    // The server writes the opening scene with one AI call, which takes 10-30 seconds: say so, and block a second tap.
+    // The server writes the region and story plan, then the opening scene: one to three minutes. Say so, and block a second tap.
     const begin = $("beginBtn");
     begin.disabled = true;
     begin.textContent = "Writing your story…";
-    const wait = el("p", "note pending", "The narrator is writing your opening scene. This takes up to half a minute; please wait.");
+    const wait = el("p", "note pending", "The narrator is planning your story: the region, its people, the hidden plot, then the opening scene. This takes one to three minutes. Keep the app open; your current game stays until the new one is ready.");
     body.prepend(wait);
     sheet.scrollTop = 0;
     let res;
     try { res = await api("/api/new", { confirm: true, character: { ...pick, name: pick.name.trim() } }); } catch { res = { status: 0, data: null }; }
     wait.remove();
     const { status, data } = res;
-    if (status === 200) { lsSet(LS.pending, ""); renderFull(data); setSheet(false); }
+    if (status === 200 && data?.pc) { lsSet(LS.pending, ""); renderFull(data); setSheet(false); }
     else {
       begin.disabled = false;
       begin.textContent = "Begin";
-      body.prepend(el("p", "note", status ? `Couldn't start the game (${status}${data?.field ? ": check " + data.field : ""}).` : "Couldn't reach the server. Try again."));
+      const why = data?.error === "generation_failed" ? "The story plan came out wrong twice. Your current game is unchanged; tap Begin to try again." :
+        status && status !== 200 ? `Couldn't start the game (${status}${data?.field ? ": check " + data.field : ""}).` : "Couldn't reach the server (or the connection dropped). Your current game is unchanged; try again.";
+      body.prepend(el("p", "note", why));
     }
   }
 

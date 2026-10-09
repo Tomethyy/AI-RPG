@@ -64,7 +64,8 @@ function renderDice(d, animate = true) {
   return box;
 }
 
-function renderHeader(location, hp, hpMax, turnNo) {
+// part: the time of day as one small word next to the turn counter (online only).
+function renderHeader(location, hp, hpMax, turnNo, part = "") {
   $("location").textContent = location;
   $("hp").textContent = `HP ${hp}/${hpMax}`;
   $("hpfill").style.width = (hp / hpMax) * 100 + "%";
@@ -74,6 +75,7 @@ function renderHeader(location, hp, hpMax, turnNo) {
   $("hpbar").setAttribute("aria-valuenow", hp);
   $("hpbar").setAttribute("aria-valuemax", hpMax);
   $("turn").textContent = "Turn " + turnNo;
+  $("tod").textContent = part;
 }
 
 // Options are { text, tag } from the server (tag like "Social · Charm") or plain strings (offline demo).

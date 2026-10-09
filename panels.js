@@ -95,7 +95,7 @@ async function openLedger() {
       if (e.type !== last) { body.append(el("h3", "", TYPE_TITLES[e.type] || e.type)); last = e.type; }
       const card = el("div", "ledger-entity");
       card.append(el("div", "ledger-name", e.name));
-      const meta = [e.where && `at ${e.where}`, e.links.length && `links: ${e.links.join(", ")}`, e.aliases?.length && `also: ${e.aliases.join(", ")}`].filter(Boolean).join(" · ");
+      const meta = [e.attitude, e.where && `at ${e.where}`, e.links.length && `links: ${e.links.join(", ")}`, e.aliases?.length && `also: ${e.aliases.join(", ")}`].filter(Boolean).join(" · ");
       if (meta) card.append(el("div", "ledger-meta", meta));
       for (const f of e.facts) card.append(el("div", "ledger-fact", "• " + f));
       body.append(card);
@@ -104,6 +104,84 @@ async function openLedger() {
   } catch {
     body.replaceChildren(el("p", "note", "Couldn't reach the server."));
   }
+}
+
+// ---- Quests (a small journal: the main quest, side quests with Focus, the threat clock; no AI call) ----
+const dots = (n, of) => "●".repeat(n) + "○".repeat(Math.max(0, of - n));
+
+async function openQuests() {
+  const body = $("ledgerBody");
+  body.replaceChildren(el("p", "note", "Loading…"));
+  showPanel(true);
+  if (!online()) { body.replaceChildren(el("p", "note", "Quests live on the server. Go back and connect a server first.")); return; }
+  try {
+    const { status, data } = await api("/api/quests");
+    if (status !== 200) { body.replaceChildren(el("p", "note", `Couldn't load the quests (${status}).`)); return; }
+    renderQuests(data);
+  } catch {
+    body.replaceChildren(el("p", "note", "Couldn't reach the server."));
+  }
+}
+
+async function focusQuest(id) {
+  try {
+    const { status, data } = await api("/api/quest", { act: "focus", id });
+    if (data?.state) applyState(data.state);
+    if (data?.quests) renderQuests(data.quests, status === 200 ? ["Focused. The narrator now offers a way forward on it every turn."] : ["That quest can't be focused now."]);
+  } catch {
+    addNote("Couldn't reach the server.");
+  }
+}
+
+function focusButton(id, on) {
+  if (on) return el("div", "ledger-meta", "★ Focused");
+  const b = el("button", "mini ghost", "Focus");
+  b.type = "button";
+  b.addEventListener("click", () => focusQuest(id));
+  return b;
+}
+
+function renderQuests(d, notes = []) {
+  const body = $("ledgerBody");
+  body.replaceChildren();
+  for (const n of notes) body.append(el("p", "note", n));
+  body.append(el("p", "note", d.time));
+  const m = d.main;
+  body.append(el("h3", "", "Main quest"));
+  const card = el("div", "ledger-entity");
+  card.append(el("div", "ledger-name", m.title));
+  if (m.stake) card.append(el("div", "ledger-meta", m.stake));
+  card.append(el("div", "ledger-meta", `Milestones ${m.done.length} of ${m.total}`));
+  for (const t of m.done) card.append(el("div", "ledger-fact", "✓ " + t));
+  if (m.current) {
+    card.append(el("div", "ledger-fact quest-now", `▸ ${m.current.title}  ${dots(m.current.steps, m.current.need)}`));
+    for (const l of m.current.leads) card.append(el("div", "ledger-fact", "• " + l));
+  }
+  if (m.choosing) card.append(el("div", "ledger-fact quest-now", `A decision lies ahead: ${m.choosing.join(" or ")}`));
+  if (m.branch) card.append(el("div", "ledger-meta", `Your path: ${m.branch}`));
+  if (m.complete) card.append(el("div", "ledger-meta", "Complete."));
+  else card.append(focusButton("main", m.focus));
+  body.append(card);
+
+  const c = d.clock;
+  body.append(el("h3", "", "Threat"));
+  const clock = el("div", "ledger-entity");
+  clock.append(el("div", "ledger-name", c.name), el("div", "ledger-fact clock", dots(c.filled, c.segments) + (c.dooms ? `  · ${c.dooms} doom${c.dooms > 1 ? "s" : ""}` : "")));
+  for (const sgn of c.signs.slice(-5)) clock.append(el("div", "ledger-fact", "• " + sgn));
+  if (!c.signs.length) clock.append(el("div", "ledger-meta", "No warning signs yet. Time, shortcuts and dead ends make it grow; finishing a milestone pushes it back."));
+  body.append(clock);
+
+  body.append(el("h3", "", "Side quests"));
+  for (const sq of d.side) {
+    const box = el("div", "ledger-entity");
+    box.append(el("div", "ledger-name", sq.title));
+    box.append(el("div", "ledger-meta", [sq.giver && `from ${sq.giver}`, sq.status === "active" ? dots(sq.steps, sq.need) : sq.status].filter(Boolean).join(" · ")));
+    box.append(el("div", "ledger-fact", sq.goal));
+    for (const l of sq.leads) box.append(el("div", "ledger-fact", "• " + l));
+    if (sq.status === "active") box.append(focusButton(sq.id, sq.focus));
+    body.append(box);
+  }
+  if (!d.side.length) body.append(el("p", "note", "None yet. People you meet may ask for help."));
 }
 
 // ---- Prompt (debug view of what the AI is sent; built by the server from the save, no AI call) ----
@@ -135,6 +213,9 @@ async function openPrompt() {
     const tiers = Object.entries(c.tiers || {}).map(([k, n]) => `${k} ${n}`).join(", ") || "none yet";
     const results = Object.entries(c.results || {}).map(([k, n]) => `${k} ${n}`).join(", ") || "none yet";
     body.append(ledgerLine("Checks", `tiers: ${tiers} · results: ${results} · edges ${c.edges || 0}`));
+    const values = Object.entries(c.values || {}).map(([k, n]) => `${k} ${n}`).join(", ") || "none yet";
+    body.append(ledgerLine("Quest", `option values: ${values} · turns without a quest option ${c.no_quest_option || 0} · steps ${c.steps || 0}` +
+      (d.region ? ` · story plan by ${d.region.model} (effort ${d.region.effort}), ${fmtUsd(d.region.cost)}` : " · fixed opening (no story plan)")));
     for (const f of (d.fallbacks || []).slice().reverse()) {
       const when = new Date(f.ts).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
       body.append(ledgerLine(`Fallback · turn ${f.turn} · ${when}`, `${REASONS[f.reason] || f.reason}${f.detail ? ": " + f.detail : ""}`));

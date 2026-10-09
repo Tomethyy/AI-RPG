@@ -8,8 +8,13 @@
 //   scene: { location_id, narration[], options[] },   what the player sees now
 //   actors: { <id>: Actor },      the player ("pc") and, later, companions. Same shape for both.
 //   party: [actor ids],           order of the party; companions get appended here
-//   ledger: { entities: { <id>: Entity } },           lore ledger, written from new_facts
-//   quests: { main: { title, milestones: { <id>: Milestone }, current, finale }, side: {}, focus },
+//   ledger: { entities: { <id>: Entity } },           lore ledger, written from new_facts (and the generated region)
+//   world: { name, summary, truth, stake, start, block, extra_places, model, cost } | null,   the generated region (region.js);
+//                                 null for the fixed Rusted Ford opening. block is the static region text for the cached prompt
+//   quests: { main: Main, side: { <id>: Side }, focus: "main"|<side id>, flags: [{turn, text}], side_seq },   quest.js
+//   clock: { name, signs[8], dooms[3], filled, dooms_hit, pending: [told next turn], seen: [{turn, kind, text}] },   threat clock
+//   time: { day, part: 0-3 (morning, afternoon, evening, night), idle },   code-owned day and time of day
+//   over: { kind: "won", turn, branch, epilogue: [paragraphs] | null } | null,   game complete (Phase 6 adds "dead")
 //   summary: { text, through_turn, requested_through, requested_at },   rolling summary of turns 1..through_turn
 //                                 (written in the background by a cheap model into "sum:<game id>", adopted on the next request)
 //   recent: [TurnRecord],         turns not yet summarized plus the newest RECENT_PROMPT, at most RECENT_KEEP
@@ -25,17 +30,25 @@
 //           equipment{slot: item}, inventory[{id,name,qty,note,gear?}], conditions[],
 //           bio {background, drive, flaw} | null, align {law, good} (hidden numbers, -12..12), talents[{id, ready_turn}],
 //           picks[{kind: "stat"|"talent", level, offer?}] (level-up choices waiting), edge_next {kind, from} | null }
-// Entity: { id, type, name, aliases[] (earlier names, kept on rename or merge), location_id, connections[], facts[{text,turn,kind}], first_turn, last_turn, danger (locations only, 0-2, set by code) }
+// Entity: { id, type, name, aliases[] (earlier names, kept on rename or merge), location_id, connections[], facts[{text,turn,kind}], first_turn, last_turn,
+//           known (false: generated but not yet heard of; hidden from the Ledger view),
+//           locations: danger (0-2, set by code), travel { <location id>: parts of a day }, region (generated)
+//           npcs: attitude (-2..2), met, profile { want, fear, secret, voice } | null, values, base, faction }
 // Gear:   { id, name, slot: "weapon"|"armor", rarity, bonus_stat, big?, damage+mult (weapons) | defense (armor) }. Inventory gear carries it in `gear`.
-// Option: { text, kind, stat, tier: "easy"|"standard"|"hard"|"daunting", edge: "none"|"advantage"|"disadvantage", edge_why }
-// Milestone: { id, title, conditions[], status: "undiscovered"|"ongoing"|"completed", next[] }
+// Option: { text, kind, stat, tier: "easy"|"standard"|"hard"|"daunting", edge: "none"|"advantage"|"disadvantage", edge_why,
+//           value: "scene"|"advance"|"costly"|"sidetrack"|"choose" (hidden), quest: quest id (or branch id for choose), npc }
+// Main: { title, conflict, milestones: { <id>: Milestone }, current, fork, branches: [{ id, choice, outcome, first }], branch, choosing }
+// Milestone: { id, title, goal, leads: [{ text, target, revealed, turn }], status: "undiscovered"|"ongoing"|"completed", next[], branch, final,
+//              steps, need, started_turn, last_step_turn, last_move_turn }
+// Side: { id, title, goal, giver, place, leads[], status: "hidden"|"active"|"completed"|"failed", origin: "seed"|"story", steps, need, ... }
 // Every turn also goes to an archive in chunks: "arc:<game id>:<n>" = [TurnRecord] (ARCHIVE_CHUNK per key).
 
 import { ensureGearStats, rollDanger, xpForLevel, MAX_LEVEL, maxHpOf, packUsed, packSlots, alignLabel, catchUpPicks } from "./rules.js";
 import { BACKGROUNDS, DRIVES, FLAWS, TALENTS, STAT_LABELS, KIND_LABELS, tierFromNumber } from "./content.js";
 import { buildActor, DEFAULT_CHARACTER, validateCharacter } from "./character.js";
+import { newQuests, newClock, newTime, openStory, PLACEHOLDER_MAIN, PLACEHOLDER_CLOCK, timeLabel, publicQuests, attitudeLabel, VALUES } from "./quest.js";
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 export const STATS = ["might", "wits", "charm", "grit"];
 export const ENTITY_TYPES = ["npc", "location", "faction", "item", "quest", "lore"];
 // A stored fact must be one of these lasting kinds; there is deliberately no "event" kind (what someone did in one scene).
@@ -44,7 +57,10 @@ export const OPTION_KINDS = ["social", "explore", "direct", "cautious", "other"]
 export const OPTION_TIERS = ["easy", "standard", "hard", "daunting"];
 export const OPTION_EDGES = ["none", "advantage", "disadvantage"];
 export const CLASSIFICATIONS = ["allowed", "conditional", "blocked"];
-export const CHANGE_KINDS = ["hp", "xp", "item_add", "item_remove", "condition_add", "condition_remove", "move", "law", "good"];
+export const CHANGE_KINDS = ["hp", "xp", "item_add", "item_remove", "condition_add", "condition_remove", "move", "law", "good", "attitude", "time"];
+export const OPTION_VALUES = VALUES; // scene, advance, costly, sidetrack ("choose" is added by code for the key decision)
+export const CUSTOM_TIERS = ["none", "easy", "standard", "hard", "daunting"];
+export const RESULTS = ["none", "success", "cost", "failure"];
 export const RECENT_PROMPT = 5; // turns the prompt shows verbatim (the newest one is the current scene)
 export const RECENT_KEEP = 12; // turns kept in the save until the summary has them
 export const SUMMARY_BATCH = 5; // summarize once this many turns have left the verbatim window
@@ -73,7 +89,8 @@ export function newEntity(id, type, name, turn, fields = {}) {
 const openingSummary = (name) => `${name} came to the old toll house at the Rusted Ford in heavy rain and found the bridge burned. Drovers sat over cold stew; a woman by the hearth was sewing a seal onto a leather satchel.`;
 const FORD = "location-the-rusted-ford";
 
-// Hand-built starting scene (the Phase 1 opening) for whatever character the player made. Phase 7 and 8 replace it with a generated region.
+// Hand-built starting scene (the Phase 1 opening) for whatever character the player made. With an API key, New game replaces it
+// with a generated region (region.js applyRegion); without one, or for a test, this placeholder story is played.
 export function newGame(slot = "main", now = new Date().toISOString(), characterInput = DEFAULT_CHARACTER) {
   const { character, error } = validateCharacter(characterInput);
   if (error) throw new Error(`bad character: ${error}`);
@@ -96,37 +113,27 @@ export function newGame(slot = "main", now = new Date().toISOString(), character
         "A woman by the hearth is sewing a seal onto a leather satchel. She notices your mud-caked boots and finally meets your eye.",
       ],
       options: [
-        { text: "Ask the woman about the bridge", kind: "social", stat: "charm", tier: "standard", edge: "none", edge_why: "" },
-        { text: "Search the toll house for a way across", kind: "explore", stat: "wits", tier: "standard", edge: "none", edge_why: "" },
-        { text: "Offer to buy a round for the drovers", kind: "social", stat: "charm", tier: "easy", edge: "none", edge_why: "" },
-        { text: "Step back outside and study the river", kind: "cautious", stat: "wits", tier: "standard", edge: "none", edge_why: "" },
+        { text: "Ask the woman about the bridge", kind: "social", stat: "charm", tier: "standard", edge: "none", edge_why: "", value: "advance", quest: "main", npc: "" },
+        { text: "Search the toll house for a way across", kind: "explore", stat: "wits", tier: "standard", edge: "none", edge_why: "", value: "scene", quest: "", npc: "" },
+        { text: "Offer to buy a round for the drovers", kind: "social", stat: "charm", tier: "easy", edge: "none", edge_why: "", value: "scene", quest: "", npc: "" },
+        { text: "Step back outside and study the river", kind: "cautious", stat: "wits", tier: "standard", edge: "none", edge_why: "", value: "sidetrack", quest: "", npc: "" },
       ],
     },
     actors: { pc: actor },
     party: ["pc"],
     ledger: { entities: {} },
-    quests: {
-      main: {
-        title: "The Burned Bridge",
-        // Placeholder graph until Phase 7 generates one per game.
-        milestones: {
-          "m1": { id: "m1", title: "Learn who burned the bridge at the Rusted Ford", conditions: ["The player knows who ordered the burning"], status: "ongoing", next: ["m2"] },
-          "m2": { id: "m2", title: "Find out why they want the road closed", conditions: ["The player learns what the closed road protects or hides"], status: "undiscovered", next: ["m3"] },
-          "m3": { id: "m3", title: "Reopen the road", conditions: ["The crossing is usable again or the culprit is stopped"], status: "undiscovered", next: [] },
-        },
-        current: "m1",
-        finale: "m3",
-      },
-      side: {},
-      focus: "main",
-    },
+    world: null,
+    quests: newQuests(PLACEHOLDER_MAIN),
+    clock: newClock(PLACEHOLDER_CLOCK),
+    time: newTime(),
+    over: null,
     // The opening scene has no turn record, so the summary starts with it.
     summary: { text: openingSummary(actor.name), through_turn: 0, requested_through: 0, requested_at: null },
     recent: [],
     last: null,
     failed: [],
     fm: null,
-    counters: { ai_turns: 0, fallbacks: 0, retries: 0, dc: {}, dc_clamped: 0, tiers: {}, results: {}, edges: 0, summaries: 0, merges: 0, fact_merges: 0, options_dropped: 0, variety_low: 0, kinds: {} },
+    counters: { ai_turns: 0, fallbacks: 0, retries: 0, dc: {}, dc_clamped: 0, tiers: {}, results: {}, edges: 0, summaries: 0, merges: 0, fact_merges: 0, options_dropped: 0, variety_low: 0, kinds: {}, values: {}, no_quest_option: 0, steps: 0 },
   };
   save.ledger.entities[FORD] = newEntity(FORD, "location", "The Rusted Ford", 1, {
     aliases: ["Rusted Ford", "toll house"],
@@ -136,10 +143,11 @@ export function newGame(slot = "main", now = new Date().toISOString(), character
       { text: "The bridge was burned; only blackened stumps remain", turn: 1 },
     ],
   });
+  openStory(save, 1);
   return save;
 }
 
-const toOption = (o) => ({ text: o.text, kind: o.kind, stat: o.stat, tier: OPTION_TIERS.includes(o.tier) ? o.tier : tierFromNumber(Number(o.difficulty) || 10), edge: OPTION_EDGES.includes(o.edge) ? o.edge : "none", edge_why: o.edge_why || "" });
+const toOption = (o) => ({ text: o.text, kind: o.kind, stat: o.stat, tier: OPTION_TIERS.includes(o.tier) ? o.tier : tierFromNumber(Number(o.difficulty) || 10), edge: OPTION_EDGES.includes(o.edge) ? o.edge : "none", edge_why: o.edge_why || "", value: o.value || "scene", quest: o.quest || "", npc: o.npc || "" });
 
 // Upgrade older saves in place. Add a step here whenever SCHEMA_VERSION goes up (and keep a test that migrates an old save).
 // The server keeps a copy of the old save before it stores a migrated one (index.js loadSave).
@@ -188,6 +196,29 @@ export function migrate(save) {
     }
     save.fm ??= null;
   }
+  if (save.v < 6) {
+    // v6: quest structure. The old three-step placeholder becomes the new quest shape with leads, from the turn it is migrated;
+    // a threat clock, the day and time of day; every known person has met the character and is neutral.
+    const old = save.quests?.main?.milestones || {};
+    save.world ??= null;
+    save.quests = newQuests(PLACEHOLDER_MAIN);
+    const main = save.quests.main;
+    const done = ["m1", "m2", "m3"].filter((id) => old[id]?.status === "completed");
+    for (const id of done) main.milestones[id].status = "completed";
+    const cur = ["m1", "m2", "m3"].find((id) => !done.includes(id)) || "m3";
+    main.current = cur;
+    openStory(save, save.turn);
+    save.clock ??= newClock(PLACEHOLDER_CLOCK);
+    save.time ??= newTime();
+    save.over ??= null;
+    for (const e of Object.values(save.ledger.entities)) {
+      e.known ??= true;
+      if (e.type === "npc") { e.attitude ??= 0; e.met ??= true; e.profile ??= null; }
+    }
+    save.scene.options = save.scene.options.map(toOption);
+    for (const t of save.recent) t.options = (t.options || []).map(toOption);
+    Object.assign(save.counters, { values: {}, no_quest_option: 0, steps: 0, ...save.counters });
+  }
   save.v = SCHEMA_VERSION;
   return save;
 }
@@ -226,8 +257,11 @@ export function publicState(save, extra = {}) {
       edge_next: p.edge_next ? { kind: p.edge_next.kind } : null,
       pick: publicPick(p), picks_left: p.picks?.length || 0,
     },
-    scene: { narration: save.scene.narration, options: save.scene.options.map((o) => ({ text: o.text, tag: [KIND_LABELS[o.kind], STAT_LABELS[o.stat]].filter(Boolean).join(" · ") })) },
-    recent: save.recent.slice(-RECENT_PROMPT).map((t) => ({ n: t.n, action: t.action.text, dice: t.dice, narration: t.narration })),
+    time: timeLabel(save.time), part: ["morning", "afternoon", "evening", "night"][save.time.part],
+    scene: { narration: save.scene.narration, options: save.scene.options.map((o) => ({ text: o.text, tag: o.value === "choose" ? "Decision" : [KIND_LABELS[o.kind], STAT_LABELS[o.stat]].filter(Boolean).join(" · ") })) },
+    recent: save.recent.slice(-RECENT_PROMPT).map((t) => ({ n: t.n, action: t.action.text, dice: t.dice, narration: t.narration, events: t.events || [] })),
+    focus: save.quests.focus === "main" ? save.quests.main.title : save.quests.side[save.quests.focus]?.title || save.quests.main.title,
+    over: save.over ? { kind: save.over.kind, turn: save.over.turn, epilogue: save.over.epilogue } : null,
     ...extra,
   };
 }
@@ -235,8 +269,13 @@ export function publicState(save, extra = {}) {
 // Read-only view of the lore ledger for the Ledger screen: what the app remembers, no AI involved.
 export function ledgerView(save) {
   const name = (id) => save.ledger.entities[id]?.name;
-  const entities = Object.values(save.ledger.entities)
-    .map((e) => ({ type: e.type, name: e.name, aliases: e.aliases, where: e.type === "location" ? undefined : name(e.location_id), links: e.connections.map(name).filter(Boolean), facts: e.facts.map((f) => f.text), last_turn: e.last_turn }))
+  const known = (id) => save.ledger.entities[id]?.known !== false && name(id);
+  // Generated people and places stay out of view until the character has heard of them; secrets stay hidden (they are in the profile).
+  const entities = Object.values(save.ledger.entities).filter((e) => e.known !== false)
+    .map((e) => ({ type: e.type, name: e.name, aliases: e.aliases, where: e.type === "location" ? undefined : known(e.location_id) || undefined, links: e.connections.map(known).filter(Boolean),
+      attitude: e.type === "npc" && e.met !== false ? attitudeLabel(e.attitude) : undefined, facts: e.facts.map((f) => f.text), last_turn: e.last_turn }))
     .sort((a, b) => ENTITY_TYPES.indexOf(a.type) - ENTITY_TYPES.indexOf(b.type) || a.name.localeCompare(b.name));
   return { turn: save.turn, here: name(save.scene.location_id), entities };
 }
+
+export { publicQuests };

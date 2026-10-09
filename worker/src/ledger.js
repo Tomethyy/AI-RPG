@@ -4,6 +4,7 @@ import { rollDanger } from "./rules.js";
 
 export const FACT_CAP = 8; // above this a cheap model merges an entity's facts (factmerge.js)
 export const FACT_HARD = 12; // if that has not happened yet, the oldest facts after the first are dropped
+export const EXTRA_PLACES = 4; // places the AI may add inside a generated region (the region is the map)
 
 export const norm = (s) => String(s || "").toLowerCase().replace(/^(the|a|an)\s+/, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
@@ -32,17 +33,26 @@ function partialMatches(save, name, type) {
   });
 }
 
-function createEntity(save, type, name, turn) {
+// In a generated region the AI may add only a few places; after that a new place name is refused (it lies beyond this story).
+export const placeRoom = (save) => !save.world || (save.world.extra_places || 0) < EXTRA_PLACES;
+
+export function createEntity(save, type, name, turn, fields = {}) {
   const base = `${type}-${slugify(name)}`;
   let id = base;
   for (let i = 2; save.ledger.entities[id]; i++) id = `${base}-${i}`;
-  const e = (save.ledger.entities[id] = newEntity(id, type, String(name).trim().slice(0, 80), turn));
-  if (type === "location") e.danger = rollDanger(save, id);
+  const e = (save.ledger.entities[id] = newEntity(id, type, String(name).trim().slice(0, 80), turn, fields));
+  if (type === "location" && e.danger === undefined) e.danger = rollDanger(save, id);
+  // Someone the AI introduces has just met the character; their first reaction is set by quest.js after the turn.
+  if (type === "npc") Object.assign(e, { attitude: 0, met: true, profile: null, ...fields });
   return e;
 }
 
+// The place by that name, a new one while the region has room, or null.
 export function ensureLocation(save, name, turn) {
-  return findEntity(save, name, "location") || createEntity(save, "location", name, turn);
+  const found = findEntity(save, name, "location");
+  if (found || !placeRoom(save)) return found;
+  if (save.world) save.world.extra_places = (save.world.extra_places || 0) + 1;
+  return createEntity(save, "location", name, turn);
 }
 
 function connect(a, b) {
@@ -57,6 +67,10 @@ function mergeEntities(save, keep, drop) {
   for (const f of drop.facts) if (!keep.facts.some((x) => norm(x.text) === norm(f.text))) keep.facts.push(f);
   keep.facts.sort((a, b) => a.turn - b.turn);
   keep.location_id ??= drop.location_id;
+  // What code generated or rolled for either record survives: a profile, values, travel times, the region flag, a met person's attitude.
+  for (const k of ["profile", "values", "base", "faction", "region", "travel", "danger"]) if (keep[k] == null && drop[k] != null) keep[k] = drop[k];
+  if (keep.met === false && drop.met !== false) { keep.met = true; keep.attitude = drop.attitude ?? 0; }
+  if (drop.known !== false) keep.known = true;
   keep.first_turn = Math.min(keep.first_turn, drop.first_turn);
   keep.last_turn = Math.max(keep.last_turn, drop.last_turn);
   delete save.ledger.entities[drop.id];
@@ -116,14 +130,19 @@ function resolveEntity(save, f, type, turn) {
   return { e, fresh: true };
 }
 
-// new_facts: [{ entity, type, fact, location, was }]. Returns how many facts were actually added.
-export function applyNewFacts(save, facts, turn) {
+// new_facts: [{ entity, type, fact, location, was }]. Returns how many facts were actually added; new entities go into `created`.
+export function applyNewFacts(save, facts, turn, created = []) {
   let added = 0;
   for (const f of facts) {
-    const type = ENTITY_TYPES.includes(f.type) ? f.type : "lore";
+    let type = ENTITY_TYPES.includes(f.type) ? f.type : "lore";
+    // A place beyond the region's room is still remembered by name, as lore that cannot be reached.
+    if (type === "location" && !findEntity(save, f.entity, "location") && !(f.was && findEntity(save, f.was, "location")) && !placeRoom(save)) type = "lore";
+    else if (type === "location" && save.world && !findEntity(save, f.entity, "location") && !(f.was && findEntity(save, f.was, "location"))) save.world.extra_places = (save.world.extra_places || 0) + 1;
     const { e, fresh } = resolveEntity(save, f, type, turn);
-    if (f.location && norm(f.location) !== norm(e.name)) {
-      const loc = ensureLocation(save, f.location, turn);
+    if (fresh) created.push(e);
+    e.known = true;
+    const loc = f.location && norm(f.location) !== norm(e.name) ? ensureLocation(save, f.location, turn) : null;
+    if (loc) {
       if (type === "location") connect(e, loc);
       else e.location_id = loc.id;
     } else if (fresh && type !== "location" && type !== "lore") {
@@ -144,11 +163,12 @@ export function applyNewFacts(save, facts, turn) {
 
 // Ledger retrieval: entities at or linked to the current location, or named in the action, the scene, its options or the last turns.
 // Returns them best first; the prompt keeps as many as fit its token budget.
-export function relevantEntities(save, actionText, { max = 20, factsEach = 6 } = {}) {
+export function relevantEntities(save, actionText, { max = 20, factsEach = 6, leads = [] } = {}) {
   const loc = save.scene.location_id;
   const here = save.ledger.entities[loc];
   const hay = (parts) => ` ${norm(parts.join(" "))} `;
   const inAction = hay([actionText]);
+  const inLeads = hay(leads);
   const inScene = hay([...save.scene.narration, ...save.scene.options.map((o) => o.text), ...save.recent.slice(-3).flatMap((t) => [t.action.text, ...t.narration])]);
   const scored = [];
   for (const e of Object.values(save.ledger.entities)) {
@@ -160,6 +180,7 @@ export function relevantEntities(save, actionText, { max = 20, factsEach = 6 } =
     if (named(inScene)) score += 20;
     if (e.location_id === loc) score += 10;
     if (e.connections.includes(loc) || here?.connections.includes(e.id)) score += 5;
+    if (named(inLeads)) score += 6; // where the revealed leads point
     if (score) scored.push([score + e.last_turn / 1e5, e]);
   }
   scored.sort((a, b) => b[0] - a[0]);
@@ -172,5 +193,6 @@ export function relevantEntities(save, actionText, { max = 20, factsEach = 6 } =
     links: e.type === "location" ? e.connections.map(name).filter(Boolean).slice(0, 6) : undefined,
     // The first fact usually says what the thing is; the newest ones say where it stands now.
     facts: (e.facts.length > factsEach ? [e.facts[0], ...e.facts.slice(-(factsEach - 1))] : e.facts).map((x) => x.text),
+    ...(e.type === "npc" ? { id: e.id, attitude: e.attitude ?? 0, met: e.met !== false, profile: e.profile || null, faction: e.faction || "" } : {}),
   }));
 }
